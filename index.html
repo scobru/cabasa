@@ -1,0 +1,2402 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cabasa — Multi-Source Generative Soundtrack</title>
+  <meta name="description" content="Strumento di musica generativa sperimentale e ambient: trasforma hardware, Wikipedia, terremoti terrestri, meteo, automi cellulari e orbita ISS in musica dal vivo.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --bg-panel: rgba(15, 20, 32, 0.72);
+      --bg-panel-border: rgba(0, 240, 255, 0.12);
+      --bg-panel-hover: rgba(23, 31, 48, 0.85);
+      --cyan-neon: #00f0ff;
+      --cyan-glow: rgba(0, 240, 255, 0.35);
+      --emerald-neon: #00ffaa;
+      --emerald-glow: rgba(0, 255, 170, 0.3);
+      --violet-neon: #a855f7;
+      --amber-neon: #f59e0b;
+      --pink-neon: #ec4899;
+      --text-main: #f1f5f9;
+      --text-muted: #8492a6;
+      --font-display: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 10% 90%, rgba(168, 85, 247, 0.06) 0%, transparent 50%),
+        linear-gradient(180deg, #07090e 0%, #0a0e17 100%);
+      color: var(--text-main);
+      font-family: var(--font-display);
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* Container */
+    .app-container {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 1.2rem 1.8rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+      flex: 1;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(168, 85, 247, 0.2));
+      border: 1px solid var(--cyan-neon);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--cyan-glow);
+    }
+
+    .logo-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--cyan-neon);
+    }
+
+    .brand-text h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ffffff, var(--cyan-neon));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4b5563;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .status-dot.active {
+      background: var(--emerald-neon);
+      box-shadow: 0 0 10px var(--emerald-glow);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.15); }
+    }
+
+    /* DATA SOURCE UNIVERSE SELECTOR */
+    .source-tabs-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .source-tabs-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .source-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(10, 14, 23, 0.65);
+      padding: 0.4rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      overflow-x: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 240, 255, 0.2) transparent;
+    }
+
+    .source-tab {
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 0.55rem 0.85rem;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+    }
+
+    .source-tab:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+    }
+
+    .source-tab.active {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: rgba(0, 240, 255, 0.4);
+      color: var(--cyan-neon);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+    }
+
+    .source-tab svg {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+    }
+
+    /* Visualizer Stage */
+    .visualizer-wrapper {
+      position: relative;
+      width: 100%;
+      height: 380px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      border-radius: 16px;
+      border: 1px solid var(--bg-panel-border);
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    canvas#visualizer-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .canvas-overlay-hud {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      pointer-events: none;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: rgba(255, 255, 255, 0.6);
+      line-height: 1.6;
+      background: rgba(7, 9, 14, 0.65);
+      padding: 0.5rem 0.8rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .canvas-overlay-hud .hud-line {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .canvas-overlay-hud .hud-val {
+      color: var(--cyan-neon);
+      font-weight: 600;
+    }
+
+    .ticker-bar {
+      position: absolute;
+      bottom: 0.8rem;
+      left: 1rem;
+      right: 1rem;
+      pointer-events: none;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: rgba(255, 255, 255, 0.7);
+      background: rgba(7, 9, 14, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .ticker-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-main);
+    }
+
+    /* Transport Overlay */
+    .transport-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(7, 9, 14, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.4rem;
+      z-index: 10;
+      transition: opacity 0.4s ease, visibility 0.4s;
+    }
+
+    .transport-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .btn-start {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(168, 85, 247, 0.25));
+      border: 1px solid var(--cyan-neon);
+      color: #fff;
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      padding: 1rem 2.6rem;
+      border-radius: 36px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      box-shadow: 0 0 35px var(--cyan-glow);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-start:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.4), rgba(168, 85, 247, 0.4));
+      box-shadow: 0 0 50px rgba(0, 240, 255, 0.6);
+    }
+
+    .btn-start svg {
+      width: 22px;
+      height: 22px;
+      fill: var(--cyan-neon);
+    }
+
+    .start-subtext {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      max-width: 500px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* Controls Strip */
+    .controls-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 0.7rem 1.1rem;
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .controls-left, .controls-right {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-icon {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      padding: 0.45rem 0.9rem;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--cyan-neon);
+      color: var(--cyan-neon);
+    }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .slider-group input[type="range"] {
+      -webkit-appearance: none;
+      width: 85px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    .slider-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--cyan-neon);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--cyan-neon);
+    }
+
+    .mood-select {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--cyan-neon);
+      padding: 0.45rem 0.8rem;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      outline: none;
+      cursor: pointer;
+      max-width: 260px;
+    }
+
+    .mood-select option {
+      background: #0d121d;
+      color: #fff;
+    }
+
+    /* Telemetry Deck */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+
+    .telemetry-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border-radius: 12px;
+      border: 1px solid var(--bg-panel-border);
+      padding: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .telemetry-card:hover {
+      border-color: rgba(0, 240, 255, 0.35);
+      transform: translateY(-2px);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--cyan-neon);
+    }
+
+    .card-metric {
+      font-family: var(--font-mono);
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: baseline;
+      gap: 0.3rem;
+    }
+
+    .metric-unit {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .meter-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 20%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--cyan-neon), var(--emerald-neon));
+      transition: width 0.3s ease;
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    .card-sound-map {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 0.2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    /* Footer */
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 1.2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 0.8rem;
+    }
+
+    .concept-pill {
+      background: rgba(0, 240, 255, 0.05);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      color: var(--cyan-neon);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Cabasa</h1>
+          <p>Realtime Generative Sonification Engine // Multi-Universe 3.0</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="status-badge">
+          <div class="status-dot" id="global-status-dot"></div>
+          <span id="global-status-text">OFFLINE</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- UNIVERSE SOURCE TABS -->
+    <div class="source-tabs-wrapper">
+      <div class="source-tabs-label">Seleziona Universo di Dati Live (Data Provider):</div>
+      <div class="source-tabs" role="tablist">
+        <button class="source-tab active" data-source="device">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+          1. DEVICE HARDWARE
+        </button>
+        <button class="source-tab" data-source="wikipedia">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          2. WIKIPEDIA LIVE
+        </button>
+        <button class="source-tab" data-source="lorenz">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12a4 4 0 1 0 8 0 4 4 0 1 0-8 0"/></svg>
+          3. LORENZ CHAOS
+        </button>
+        <button class="source-tab" data-source="iss">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/></svg>
+          4. ISS ORBIT
+        </button>
+        <button class="source-tab" data-source="earthquake">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h5l3-9 4 18 3-9h5"/></svg>
+          5. EARTH SEISMIC (USGS)
+        </button>
+        <button class="source-tab" data-source="gameoflife">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          6. GAME OF LIFE
+        </button>
+        <button class="source-tab" data-source="atmosphere">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+          7. ATMOSPHERE & WIND
+        </button>
+      </div>
+    </div>
+
+    <!-- Visualizer Stage -->
+    <div class="visualizer-wrapper" id="visualizer-container">
+      <canvas id="visualizer-canvas"></canvas>
+      
+      <div class="canvas-overlay-hud">
+        <div class="hud-line">SOURCE: <span class="hud-val" id="hud-source">DEVICE HARDWARE</span></div>
+        <div class="hud-line">ENGINE: <span class="hud-val" id="hud-engine">STANDBY</span></div>
+        <div class="hud-line">POLYPHONY: <span class="hud-val" id="hud-polyphony">0 VOICES</span></div>
+        <div class="hud-line">SCALE: <span class="hud-val" id="hud-scale">ETHEREAL LYDIAN</span></div>
+        <div class="hud-line">KIT: <span class="hud-val" id="hud-kit">VETRO &amp; CAMPANE</span></div>
+      </div>
+
+      <div class="ticker-bar" id="ticker-bar">
+        <span class="ticker-text" id="ticker-text">Pronto. Seleziona una sorgente dati e una scala modale per iniziare.</span>
+      </div>
+
+      <!-- Start / Stop Interaction Overlay -->
+      <div class="transport-overlay" id="transport-overlay">
+        <button class="btn-start" id="btn-master-start">
+          <svg viewBox="0 0 24 24">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          START CABASA
+        </button>
+        <p class="start-subtext">
+          Cabasa sintetizza musica generativa in tempo reale mappando 7 universi di dati (hardware, Wikipedia live, terremoti planetari, meteo, automi cellulari e orbita spaziale) su 12 scale modali esotiche.
+        </p>
+      </div>
+    </div>
+
+    <!-- Controls Strip -->
+    <div class="controls-strip">
+      <div class="controls-left">
+        <button class="btn-icon" id="btn-toggle-play">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          <span id="toggle-play-label">PAUSA</span>
+        </button>
+
+        <div class="slider-group">
+          <span>VOLUME</span>
+          <input type="range" id="slider-volume" min="0" max="1" step="0.01" value="0.75">
+          <span id="volume-val">75%</span>
+        </div>
+
+        <div class="slider-group">
+          <span>DINAMICA</span>
+          <input type="range" id="slider-sensitivity" min="0.5" max="2.5" step="0.1" value="1.5">
+          <span id="sensitivity-val">1.5x</span>
+        </div>
+
+        <div class="slider-group">
+          <span>KIT</span>
+          <select class="mood-select" id="select-kit">
+            <option value="glass">1. Vetro &amp; Campane (Cristallino)</option>
+            <option value="analog">2. Analogico Caldo (Moog / Saw)</option>
+            <option value="gamelan">3. Gamelan Metallico (Inarmonico)</option>
+            <option value="strings">4. Archi &amp; Fiati (Arco Lento)</option>
+            <option value="pulse">5. Pulse Digitale (Staccato Chip)</option>
+            <option value="sub">6. Sub &amp; Pelle (Percussivo Cupo)</option>
+          </select>
+        </div>
+
+        <div class="slider-group">
+          <span>SCALA</span>
+          <select class="mood-select" id="select-mood">
+            <option value="lydian">1. Ethereal Lydian (Ambient Mistico)</option>
+            <option value="cyberpunk">2. Cyberpunk Dorian (Blade Runner)</option>
+            <option value="deepdrone">3. Deep Core Sus2 (Eno Meditativo)</option>
+            <option value="hirajoshi">4. Hirajoshi (Zen Giapponese)</option>
+            <option value="insen">5. Insen Traditional (Drammatico Est)</option>
+            <option value="harmonicMinor">6. Harmonic Minor (Dark Wave Neoclassico)</option>
+            <option value="phrygianDom">7. Phrygian Dominant (Flamenco / Desert)</option>
+            <option value="doubleHarmonic">8. Double Harmonic (Byzantine Mysticism)</option>
+            <option value="wholeTone">9. Whole Tone (Debussy Dreamscape)</option>
+            <option value="pelog">10. Pelog Bali (Gamelan Bell Chimes)</option>
+            <option value="ragaBhairav">11. Raga Bhairav (Alba Spirituale)</option>
+            <option value="neoNoir">12. Neo-Noir Blues (Cinematic Rain)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="controls-right">
+        <button class="btn-icon" id="btn-fullscreen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          FULLSCREEN
+        </button>
+      </div>
+    </div>
+
+    <!-- Dynamic Telemetry Cards Grid -->
+    <div class="telemetry-grid" id="telemetry-grid">
+      <!-- Card 1 -->
+      <div class="telemetry-card" id="card-1">
+        <div class="card-top">
+          <span class="card-title" id="c1-title">CPU Cores</span>
+          <span class="card-badge" id="c1-badge">DETECTING...</span>
+        </div>
+        <div class="card-metric">
+          <span id="c1-val">--</span>
+          <span class="metric-unit" id="c1-unit">Voci</span>
+        </div>
+        <div class="meter-bar"><div class="meter-fill" id="c1-meter" style="width: 50%;"></div></div>
+        <div class="card-sound-map"><span id="c1-map">Oscillatori stereo spazializzati L/R</span></div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="telemetry-card" id="card-2">
+        <div class="card-top">
+          <span class="card-title" id="c2-title">Event Loop Jitter</span>
+          <span class="card-badge" id="c2-badge">NOMINAL</span>
+        </div>
+        <div class="card-metric">
+          <span id="c2-val">0.0</span>
+          <span class="metric-unit" id="c2-unit">ms delay</span>
+        </div>
+        <div class="meter-bar"><div class="meter-fill" id="c2-meter" style="width: 20%;"></div></div>
+        <div class="card-sound-map"><span id="c2-map">Filtro Cutoff & Risonanza Moog</span></div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="telemetry-card" id="card-3">
+        <div class="card-top">
+          <span class="card-title" id="c3-title">RAM & Heap</span>
+          <span class="card-badge" id="c3-badge">LIVE</span>
+        </div>
+        <div class="card-metric">
+          <span id="c3-val">--</span>
+          <span class="metric-unit" id="c3-unit">MB Heap</span>
+        </div>
+        <div class="meter-bar"><div class="meter-fill" id="c3-meter" style="width: 35%;"></div></div>
+        <div class="card-sound-map"><span id="c3-map">Decay Riverbero & Chimes</span></div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="telemetry-card" id="card-4">
+        <div class="card-top">
+          <span class="card-title" id="c4-title">Alimentazione</span>
+          <span class="card-badge" id="c4-badge">AC</span>
+        </div>
+        <div class="card-metric">
+          <span id="c4-val">100</span>
+          <span class="metric-unit" id="c4-unit">%</span>
+        </div>
+        <div class="meter-bar"><div class="meter-fill" id="c4-meter" style="width: 100%;"></div></div>
+        <div class="card-sound-map"><span id="c4-map">Tape Flutter & Wow LFO</span></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div class="footer-left">
+        <span class="concept-pill">100% Serverless Audio Engine</span>
+        <span>7 Provider Dati Live &bull; 12 Scale Modali &bull; Web Audio API & Canvas Hi-DPI.</span>
+      </div>
+      <div class="footer-right">
+        <span>Cabasa &mdash; Infinite Algorithmic Soundtrack</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    /**
+     * CABASA — GENERATIVE SONIFICATION ENGINE 3.0
+     * 7 Data Providers & 12 Curated Musical Scales
+     */
+
+    const SCALES = {
+      lydian: {
+        name: 'Ethereal Lydian',
+        base: 65.41, // C2
+        ratios: [1, 9/8, 5/4, 45/32, 3/2, 27/16, 15/8, 2, 9/4, 5/2, 45/16, 3, 27/8, 4]
+      },
+      cyberpunk: {
+        name: 'Cyberpunk Dorian',
+        base: 55.0, // A1
+        ratios: [1, 9/8, 6/5, 4/3, 3/2, 27/16, 9/5, 2, 9/4, 12/5, 8/3, 3, 27/8, 4]
+      },
+      deepdrone: {
+        name: 'Deep Core Sus2',
+        base: 43.65, // F1
+        ratios: [1, 9/8, 4/3, 3/2, 9/4, 2, 3, 4, 9/2, 6, 8]
+      },
+      hirajoshi: {
+        name: 'Hirajoshi Minimal',
+        base: 58.27, // A#1
+        ratios: [1, 9/8, 6/5, 3/2, 8/5, 2, 9/4, 12/5, 3, 16/5, 4]
+      },
+      insen: {
+        name: 'Insen Traditional',
+        base: 65.41, // C2
+        ratios: [1, 16/15, 4/3, 3/2, 9/5, 2, 32/15, 8/3, 3, 18/5, 4]
+      },
+      harmonicMinor: {
+        name: 'Harmonic Minor',
+        base: 55.0, // A1
+        ratios: [1, 9/8, 6/5, 4/3, 3/2, 8/5, 15/8, 2, 9/4, 12/5, 8/3, 3, 16/5, 4]
+      },
+      phrygianDom: {
+        name: 'Phrygian Dominant',
+        base: 49.0, // G1
+        ratios: [1, 16/15, 5/4, 4/3, 3/2, 8/5, 9/5, 2, 32/15, 5/2, 8/3, 3, 16/5, 4]
+      },
+      doubleHarmonic: {
+        name: 'Double Harmonic',
+        base: 65.41, // C2
+        ratios: [1, 16/15, 5/4, 4/3, 3/2, 8/5, 15/8, 2, 32/15, 5/2, 8/3, 3, 16/5, 4]
+      },
+      wholeTone: {
+        name: 'Whole Tone Dreamscape',
+        base: 51.91, // G#1
+        ratios: [1, 9/8, 5/4, 45/32, 18/11, 2, 9/4, 5/2, 45/16, 36/11, 4]
+      },
+      pelog: {
+        name: 'Pelog Bali Gamelan',
+        base: 58.27, // A#1
+        ratios: [1, 17/16, 19/16, 3/2, 27/16, 2, 34/16, 38/16, 3, 54/16, 4]
+      },
+      ragaBhairav: {
+        name: 'Raga Bhairav (Dawn)',
+        base: 65.41, // C2
+        ratios: [1, 16/15, 5/4, 4/3, 3/2, 8/5, 15/8, 2, 32/15, 5/2, 8/3, 3]
+      },
+      neoNoir: {
+        name: 'Neo-Noir Blues',
+        base: 55.0, // A1
+        ratios: [1, 6/5, 4/3, 7/5, 3/2, 9/5, 2, 12/5, 8/3, 14/5, 3, 18/5, 4]
+      }
+    };
+
+    /**
+     * Kit strumentali: cambiano il corpo del suono, non le note.
+     * drone    = forme d'onda ciclate sulle voci tenute
+     * lfoDepth = drift d'intonazione (cent) del vibrato lento
+     * q        = risonanza del passa-basso
+     * dur      = moltiplicatore di durata delle note (staccato <-> tenuto)
+     * partial  = parziale inarmonica: il rapporto decide se suona campana, metallo o legno
+     */
+    const KITS = {
+      glass: {
+        name: 'Vetro & Campane',
+        drone: ['sine', 'sine', 'triangle'], lfoDepth: 1.2, q: 3.5, dur: 1.0,
+        bell:   { type: 'sine',     attack: 0.012,  amp: 0.085, partial: 2.76, pAmp: 0.28, pDur: 0.45 },
+        pluck:  { type: 'triangle', attack: 0.004,  amp: 0.075, partial: 0,    pAmp: 0,    pDur: 0 },
+        glitch: { type: 'square',   attack: 0.002,  amp: 0.030, partial: 0,    pAmp: 0,    pDur: 0 }
+      },
+      analog: {
+        name: 'Analogico Caldo',
+        drone: ['sawtooth', 'triangle', 'sawtooth'], lfoDepth: 4.5, q: 8.0, dur: 0.85,
+        bell:   { type: 'triangle', attack: 0.02,   amp: 0.070, partial: 1.5,  pAmp: 0.22, pDur: 0.6 },
+        pluck:  { type: 'sawtooth', attack: 0.002,  amp: 0.055, partial: 0,    pAmp: 0,    pDur: 0 },
+        glitch: { type: 'sawtooth', attack: 0.001,  amp: 0.035, partial: 0,    pAmp: 0,    pDur: 0 }
+      },
+      gamelan: {
+        name: 'Gamelan Metallico',
+        drone: ['triangle', 'square', 'triangle'], lfoDepth: 2.5, q: 5.5, dur: 0.7,
+        bell:   { type: 'sine',   attack: 0.001,  amp: 0.080, partial: 3.01, pAmp: 0.55, pDur: 0.30 },
+        pluck:  { type: 'square', attack: 0.001,  amp: 0.042, partial: 5.4,  pAmp: 0.30, pDur: 0.15 },
+        glitch: { type: 'square', attack: 0.001,  amp: 0.028, partial: 7.2,  pAmp: 0.25, pDur: 0.10 }
+      },
+      strings: {
+        name: 'Archi & Fiati',
+        drone: ['sawtooth', 'sawtooth', 'triangle'], lfoDepth: 6.5, q: 2.0, dur: 1.9,
+        bell:   { type: 'sawtooth', attack: 0.30,  amp: 0.055, partial: 0,   pAmp: 0,    pDur: 0 },
+        pluck:  { type: 'triangle', attack: 0.09,  amp: 0.060, partial: 0,   pAmp: 0,    pDur: 0 },
+        glitch: { type: 'sawtooth', attack: 0.04,  amp: 0.030, partial: 0,   pAmp: 0,    pDur: 0 }
+      },
+      pulse: {
+        name: 'Pulse Digitale',
+        drone: ['square', 'square', 'sawtooth'], lfoDepth: 0.4, q: 12.0, dur: 0.45,
+        bell:   { type: 'square', attack: 0.001,  amp: 0.045, partial: 2.0,  pAmp: 0.30, pDur: 0.25 },
+        pluck:  { type: 'square', attack: 0.001,  amp: 0.050, partial: 0,    pAmp: 0,    pDur: 0 },
+        glitch: { type: 'square', attack: 0.0005, amp: 0.040, partial: 0,    pAmp: 0,    pDur: 0 }
+      },
+      sub: {
+        name: 'Sub & Pelle',
+        drone: ['sine', 'sine', 'sine'], lfoDepth: 0.8, q: 1.5, dur: 1.3,
+        bell:   { type: 'sine',     attack: 0.008, amp: 0.090, partial: 1.98, pAmp: 0.15, pDur: 0.20 },
+        pluck:  { type: 'sine',     attack: 0.002, amp: 0.085, partial: 0,    pAmp: 0,    pDur: 0 },
+        glitch: { type: 'triangle', attack: 0.002, amp: 0.035, partial: 0,    pAmp: 0,    pDur: 0 }
+      }
+    };
+
+    class CabasaAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.filter = null;
+        this.analyser = null;
+        this.reverbNode = null;
+        this.reverbGain = null;
+        this.delayLeft = null;
+        this.delayRight = null;
+        this.delayFeedback = null;
+        this.limiter = null;
+
+        this.voices = [];
+        this.activeScale = SCALES.lydian;
+        this.activeKit = KITS.glass;
+        this.isPlaying = false;
+        this.volume = 0.75;
+        this.sensitivity = 1.5; // Moltiplicatore di espressività dinamica
+        this.tremOsc = null;
+        this.tremGain = null;
+        this.activeOneShots = 0;
+        this.chord = [0, 2, 4, 7];
+      }
+
+      setSensitivity(val) {
+        this.sensitivity = val;
+      }
+
+      async init() {
+        if (this.ctx) return;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContextClass({ latencyHint: 'playback' });
+
+        this.limiter = this.ctx.createDynamicsCompressor();
+        this.limiter.threshold.setValueAtTime(-2.0, this.ctx.currentTime);
+        this.limiter.knee.setValueAtTime(4.0, this.ctx.currentTime);
+        this.limiter.ratio.setValueAtTime(12.0, this.ctx.currentTime);
+        this.limiter.attack.setValueAtTime(0.005, this.ctx.currentTime);
+        this.limiter.release.setValueAtTime(0.1, this.ctx.currentTime);
+
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+
+        // Bus tremolo: somma direttamente in masterGain.gain -> pulsazione d'ampiezza udibile
+        this.tremGain = this.ctx.createGain();
+        this.tremGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        this.tremOsc = this.ctx.createOscillator();
+        this.tremOsc.type = 'sine';
+        this.tremOsc.frequency.setValueAtTime(0.1, this.ctx.currentTime);
+        this.tremOsc.connect(this.tremGain);
+        this.tremGain.connect(this.masterGain.gain);
+        this.tremOsc.start();
+
+        this.filter = this.ctx.createBiquadFilter();
+        this.filter.type = 'lowpass';
+        this.filter.frequency.setValueAtTime(1400, this.ctx.currentTime);
+        this.filter.Q.setValueAtTime(this.activeKit.q, this.ctx.currentTime);
+
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = 1024;
+        this.analyser.smoothingTimeConstant = 0.85;
+
+        this.reverbNode = this.ctx.createConvolver();
+        this.reverbNode.buffer = this.generateImpulse(3.5, 2.0);
+        this.reverbGain = this.ctx.createGain();
+        this.reverbGain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+
+        this.delayLeft = this.ctx.createDelay(2.0);
+        this.delayRight = this.ctx.createDelay(2.0);
+        this.delayLeft.delayTime.setValueAtTime(0.375, this.ctx.currentTime);
+        this.delayRight.delayTime.setValueAtTime(0.5, this.ctx.currentTime);
+
+        this.delayFeedback = this.ctx.createGain();
+        this.delayFeedback.gain.setValueAtTime(0.38, this.ctx.currentTime);
+
+        const delayPanL = this.ctx.createStereoPanner();
+        const delayPanR = this.ctx.createStereoPanner();
+        delayPanL.pan.setValueAtTime(-0.7, this.ctx.currentTime);
+        delayPanR.pan.setValueAtTime(0.7, this.ctx.currentTime);
+
+        // Ping-pong L -> R -> feedback -> L. Guadagno d'anello == delayFeedback.gain.
+        // Prima panL e panR sommavano entrambi nel feedback che rialimentava entrambi i delay:
+        // guadagno d'anello raddoppiato (fino a 1.2 con Lorenz) => auto-oscillazione.
+        this.delayLeft.connect(this.delayRight);
+        this.delayRight.connect(this.delayFeedback);
+        this.delayFeedback.connect(this.delayLeft);
+        this.delayLeft.connect(delayPanL);
+        this.delayRight.connect(delayPanR);
+
+        this.filter.connect(this.masterGain);
+        this.filter.connect(this.delayLeft);
+        this.filter.connect(this.reverbNode);
+        this.reverbNode.connect(this.reverbGain);
+        this.reverbGain.connect(this.masterGain);
+        delayPanL.connect(this.masterGain);
+        delayPanR.connect(this.masterGain);
+
+        this.masterGain.connect(this.limiter);
+        this.limiter.connect(this.analyser);
+        this.analyser.connect(this.ctx.destination);
+
+        this.setupVoices(Math.min(10, Math.max(4, navigator.hardwareConcurrency || 8)));
+      }
+
+      generateImpulse(duration, decay) {
+        const sr = this.ctx.sampleRate;
+        const len = sr * duration;
+        const buf = this.ctx.createBuffer(2, len, sr);
+        const l = buf.getChannelData(0);
+        const r = buf.getChannelData(1);
+        for (let i = 0; i < len; i++) {
+          const multi = Math.pow((len - i) / len, decay);
+          l[i] = ((Math.random() * 2) - 1) * multi;
+          r[i] = ((Math.random() * 2) - 1) * multi;
+        }
+        return buf;
+      }
+
+      setupVoices(count) {
+        this.voices.forEach(v => {
+          try { v.osc.stop(); v.lfo.stop(); } catch(e){}
+          try { v.osc.disconnect(); v.gain.disconnect(); v.panner.disconnect(); v.lfo.disconnect(); v.lfoGain.disconnect(); } catch(e){}
+        });
+        this.voices = [];
+
+        for (let i = 0; i < count; i++) {
+          const panVal = count > 1 ? -0.85 + (1.7 * (i / (count - 1))) : 0;
+          const panner = this.ctx.createStereoPanner();
+          panner.pan.setValueAtTime(panVal, this.ctx.currentTime);
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+
+          const osc = this.ctx.createOscillator();
+          osc.type = this.activeKit.drone[i % this.activeKit.drone.length];
+
+          const freq = this.chordFreq(i);
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+          const lfo = this.ctx.createOscillator();
+          const lfoGain = this.ctx.createGain();
+          lfo.frequency.setValueAtTime(0.08 + (i * 0.02), this.ctx.currentTime);
+          lfoGain.gain.setValueAtTime(this.activeKit.lfoDepth, this.ctx.currentTime);
+          lfo.connect(lfoGain);
+          lfoGain.connect(osc.detune);
+          lfo.start();
+
+          osc.connect(gain);
+          gain.connect(panner);
+          panner.connect(this.filter);
+          osc.start();
+
+          this.voices.push({
+            id: i,
+            osc,
+            gain,
+            panner,
+            lfo,
+            lfoGain,
+            baseFreq: freq,
+            targetGain: 0.12 / Math.sqrt(count)
+          });
+        }
+      }
+
+      setScale(scaleKey) {
+        if (!SCALES[scaleKey]) return;
+        this.activeScale = SCALES[scaleKey];
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        this.voices.forEach((v, i) => {
+          const freq = this.chordFreq(i);
+          v.baseFreq = freq;
+          v.osc.frequency.setTargetAtTime(freq, now, 0.4);
+        });
+      }
+
+      // Cambia il corpo del suono a caldo: forme d'onda del drone, vibrato, risonanza.
+      // Le note tenute non si interrompono, cambia solo il loro timbro.
+      setKit(kitKey) {
+        if (!KITS[kitKey]) return;
+        this.activeKit = KITS[kitKey];
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const k = this.activeKit;
+        this.filter.Q.setTargetAtTime(k.q, now, 0.2);
+        this.voices.forEach((v, i) => {
+          v.osc.type = k.drone[i % k.drone.length];
+          v.lfoGain.gain.setTargetAtTime(k.lfoDepth, now, 0.3);
+        });
+      }
+
+      setVolume(val) {
+        this.volume = val;
+        if (this.masterGain && this.ctx) {
+          this.masterGain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.05);
+        }
+      }
+
+      async start() {
+        if (!this.ctx) await this.init();
+        if (this.ctx.state === 'suspended') await this.ctx.resume();
+        this.isPlaying = true;
+        const now = this.ctx.currentTime;
+        this.voices.forEach(v => {
+          v.gain.gain.setTargetAtTime(v.targetGain, now, 1.2);
+        });
+      }
+
+      pause() {
+        if (!this.ctx) return;
+        this.isPlaying = false;
+        const now = this.ctx.currentTime;
+        this.voices.forEach(v => {
+          v.gain.gain.setTargetAtTime(0.0001, now, 0.3);
+        });
+      }
+
+      // ---- Mappature udibili ----------------------------------------------
+      // Ogni provider aveva un solo bersaglio (il cutoff), spesso saturato al clamp.
+      // Questi helper danno tre dimensioni realmente percepibili: brillantezza,
+      // armonia (l'accordo tenuto dal drone) e pulsazione d'ampiezza.
+
+      // Grado di scala -> frequenza. Gradi oltre la scala salgono di ottava.
+      degreeFreq(degree, octave = 1) {
+        const r = this.activeScale.ratios;
+        const d = Math.round(degree);
+        const idx = ((d % r.length) + r.length) % r.length;
+        const extra = Math.floor(d / r.length);
+        return this.activeScale.base * r[idx] * octave * Math.pow(2, Math.max(0, extra));
+      }
+
+      chordFreq(i) {
+        const oct = Math.pow(2, Math.floor(i / this.chord.length));
+        return this.degreeFreq(this.chord[i % this.chord.length], oct);
+      }
+
+      // n in 0..1. Mappa esponenziale: lo sweep si sente lineare all'orecchio.
+      // La sensibilita' espande il contrasto attorno al centro invece di
+      // moltiplicare dentro il clamp (dove ogni valore suonava identico).
+      setBrightness(n, glide = 0.15) {
+        if (!this.ctx || !this.filter) return;
+        const shaped = Math.min(1, Math.max(0, 0.5 + (n - 0.5) * this.sensitivity));
+        const f = 300 * Math.pow(7000 / 300, shaped);
+        this.filter.frequency.setTargetAtTime(f, this.ctx.currentTime, glide);
+      }
+
+      // Il cambio d'accordo e' la variazione piu' udibile di tutte: sposta l'armonia,
+      // non solo il timbro. No-op se l'accordo e' identico (evita glide continui).
+      setChord(degrees, glide = 0.5) {
+        if (!degrees || !degrees.length) return;
+        if (degrees.length === this.chord.length && degrees.every((d, i) => d === this.chord[i])) return;
+        this.chord = degrees.slice();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        this.voices.forEach((v, i) => {
+          const f = this.chordFreq(i);
+          v.baseFreq = f;
+          v.osc.frequency.setTargetAtTime(f, now, glide);
+        });
+      }
+
+      setTremolo(rate, depth) {
+        if (!this.ctx || !this.tremOsc) return;
+        const now = this.ctx.currentTime;
+        this.tremOsc.frequency.setTargetAtTime(Math.max(0.05, rate), now, 0.4);
+        this.tremGain.gain.setTargetAtTime(Math.min(0.6, Math.max(0, depth)) * this.volume, now, 0.4);
+      }
+
+      // Cambiando provider il vecchio stato restava appeso: Wikipedia e Game of Life
+      // non toccavano mai il filtro, quindi ereditavano (per esempio) i 340 Hz
+      // dell'eclissi ISS e suonavano ovattati per sempre.
+      resetModulation() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        this.filter.Q.setTargetAtTime(this.activeKit.q, now, 0.2);
+        this.reverbGain.gain.setTargetAtTime(0.35, now, 0.3);
+        this.delayFeedback.gain.setTargetAtTime(0.3, now, 0.3);
+        this.setTremolo(0.1, 0);
+        this.voices.forEach(v => v.osc.detune.setTargetAtTime(0, now, 0.3));
+        this.setBrightness(0.5, 0.3);
+      }
+
+      // ---- One-shot ---------------------------------------------------------
+      // timbre: 'bell' | 'pluck' | 'glitch'
+      triggerNote(freq, pan = 0, duration = 1.2, timbre = 'bell') {
+        if (!this.ctx || !this.isPlaying) return;
+        if (this.activeOneShots > 26) return; // tetto di polifonia: oltre e' fanghiglia, non musica
+        if (!isFinite(freq) || freq < 20 || freq > 12000) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const panner = this.ctx.createStereoPanner();
+
+        const k = this.activeKit;
+        const v = k[timbre] || k.bell;
+        duration = Math.max(0.05, duration * k.dur);
+        const amp = v.amp;
+        // L'attacco non puo' superare la nota: con gli archi (0.3s) su un glitch corto
+        // i due eventi finirebbero in ordine invertito sulla stessa AudioParam.
+        const attack = Math.min(v.attack, duration * 0.4);
+        const partial = v.partial;
+
+        osc.type = v.type;
+        osc.frequency.setValueAtTime(freq, now);
+        panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), now);
+
+        // Attacco rampato: prima era setValueAtTime istantaneo => click su ogni nota.
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(amp, now + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(panner);
+        panner.connect(this.reverbNode);
+        panner.connect(this.delayLeft);
+        panner.connect(this.masterGain);
+
+        let osc2 = null, gain2 = null;
+        if (partial && v.pAmp > 0 && freq * partial < 11000) {
+          osc2 = this.ctx.createOscillator();
+          gain2 = this.ctx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(freq * partial, now);
+          gain2.gain.setValueAtTime(0.0001, now);
+          gain2.gain.exponentialRampToValueAtTime(amp * v.pAmp, now + attack);
+          gain2.gain.exponentialRampToValueAtTime(0.0001, now + duration * v.pDur);
+          osc2.connect(gain2);
+          gain2.connect(panner);
+          osc2.start(now);
+          osc2.stop(now + duration * v.pDur + 0.05);
+        }
+
+        this.activeOneShots++;
+        osc.onended = () => {
+          this.activeOneShots--;
+          // Senza disconnect i nodi restano nel grafo: con lo stream Wikipedia
+          // erano decine al secondo che non venivano mai raccolti.
+          try { osc.disconnect(); gain.disconnect(); panner.disconnect(); } catch (e) {}
+          if (osc2) { try { osc2.disconnect(); gain2.disconnect(); } catch (e) {} }
+        };
+
+        osc.start(now);
+        osc.stop(now + duration + 0.05);
+      }
+
+      // Deep gong / sub pulse for earthquakes
+      triggerSubGong(freq, duration = 3.5, pan = 0) {
+        if (!this.ctx || !this.isPlaying) return;
+        if (!isFinite(freq) || freq < 15) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const panner = this.ctx.createStereoPanner();
+
+        osc.type = this.activeKit.drone[0];
+        duration = Math.max(0.4, duration * this.activeKit.dur);
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(Math.max(18, freq * 0.7), now + duration);
+
+        panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.2, now + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(panner);
+        panner.connect(this.reverbNode);
+        panner.connect(this.masterGain);
+
+        this.activeOneShots++;
+        osc.onended = () => {
+          this.activeOneShots--;
+          try { osc.disconnect(); gain.disconnect(); panner.disconnect(); } catch (e) {}
+        };
+
+        osc.start(now);
+        osc.stop(now + duration + 0.1);
+      }
+    }
+
+    // PROVIDER 1: Device Hardware
+    class DeviceMonitor {
+      constructor() {
+        this.cores = navigator.hardwareConcurrency || 8;
+        this.jitterMs = 0;
+        this.heapMB = 45;
+        this.battery = 1.0;
+        this.charging = true;
+        this.lastTime = performance.now();
+
+        if ('getBattery' in navigator) {
+          navigator.getBattery().then(b => {
+            this.battery = b.level;
+            this.charging = b.charging;
+            b.addEventListener('levelchange', () => { this.battery = b.level; });
+            b.addEventListener('chargingchange', () => { this.charging = b.charging; });
+          }).catch(()=>{});
+        }
+      }
+
+      update(engine) {
+        const now = performance.now();
+        const delta = now - this.lastTime;
+        this.lastTime = now;
+        // Il loop chiama update() ogni 200ms, non ogni frame: confrontarlo con 16.67ms
+        // dava sempre ~183ms, quindi il cutoff restava incollato al clamp massimo.
+        const jitter = Math.abs(delta - 200);
+        this.jitterMs = (this.jitterMs * 0.8) + (jitter * 0.2);
+
+        if (performance.memory) {
+          this.heapMB = Math.round(performance.memory.usedJSHeapSize / (1024 * 1024));
+        }
+
+        if (engine && engine.isPlaying) {
+          const sens = engine.sensitivity || 1.5;
+          // Jitter -> brillantezza. Base 0.3 + heap: a macchina scarica il jitter e' ~0,
+          // da solo lasciava il filtro parcheggiato sul fondo e il drone spariva.
+          const heapNorm = Math.min(1, this.heapMB / 120);
+          engine.setBrightness(0.3 + Math.min(0.5, this.jitterMs / 20) + heapNorm * 0.2, 0.12);
+
+          // Heap -> grado dell'accordo: la memoria che cresce trasporta l'armonia in alto
+          const step = Math.round(this.heapMB / 22);
+          engine.setChord([step, step + 2, step + 4, step + 6]);
+
+          // Batteria -> tremolo: in carica respiro veloce, in scarica pulsazione lenta e profonda
+          engine.setTremolo(this.charging ? 1.8 : 0.25 + this.battery, (1 - this.battery) * 0.5);
+
+          const pulseInterval = Math.max(180, 700 / sens);
+          if (!this.lastPulse || (now - this.lastPulse > pulseInterval)) {
+            this.lastPulse = now;
+            const coreIdx = Math.floor(Math.random() * this.cores);
+            const deg = engine.chord[coreIdx % engine.chord.length] + (coreIdx % 3 === 0 ? 7 : 4);
+            const pan = this.cores > 1 ? -0.85 + (1.7 * (coreIdx / (this.cores - 1))) : 0;
+            engine.triggerNote(engine.degreeFreq(deg, 2), pan, 0.9, 'pluck');
+          }
+        }
+
+        return {
+          c1: { title: 'CPU CORES', val: this.cores, unit: 'Voci', badge: `${this.cores} LOGICAL`, meter: Math.min(100, (this.cores / 32) * 100), map: 'Oscillatori & note polifoniche' },
+          c2: { title: 'EVENT LOOP JITTER', val: this.jitterMs.toFixed(1), unit: 'ms', badge: this.jitterMs > 8 ? 'STRESS' : 'NOMINAL', meter: Math.min(100, this.jitterMs * 4), map: 'Brillantezza del filtro' },
+          c3: { title: 'RAM / JS HEAP', val: this.heapMB, unit: 'MB', badge: 'LIVE HEAP', meter: Math.min(100, (this.heapMB / 200) * 100), map: 'Grado dell\'accordo tenuto' },
+          c4: { title: 'ALIMENTAZIONE', val: Math.round(this.battery * 100), unit: '%', badge: this.charging ? 'CHARGING' : 'BATTERY', meter: Math.round(this.battery * 100), map: 'Tremolo: profondità e velocità' },
+          ticker: `Hardware: ${this.cores} core attivi | Jitter: ${this.jitterMs.toFixed(1)}ms | RAM Heap: ${this.heapMB}MB | Batteria: ${Math.round(this.battery * 100)}%`
+        };
+      }
+    }
+
+    // PROVIDER 2: Wikipedia Live Stream (SSE)
+    class WikipediaStream {
+      constructor(engine) {
+        this.engine = engine;
+        this.evtSource = null;
+        this.active = false;
+        this.editsCount = 0;
+        this.lastTitle = 'In attesa di connessione a Wikipedia...';
+        this.humanEdits = 0;
+        this.botEdits = 0;
+        this.recentEditsList = [];
+        this.lastNoteTime = 0;
+        this.rateWindow = [];
+      }
+
+      start() {
+        if (this.evtSource) return;
+        try {
+          this.evtSource = new EventSource('https://stream.wikimedia.org/v2/stream/recentchange');
+          this.evtSource.onmessage = (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              if (data.type !== 'edit') return;
+              this.onEdit(data);
+            } catch (err) {}
+          };
+          this.active = true;
+        } catch (e) {
+          this.lastTitle = 'Errore connessione SSE Wikipedia';
+        }
+      }
+
+      stop() {
+        if (this.evtSource) {
+          this.evtSource.close();
+          this.evtSource = null;
+        }
+        this.active = false;
+      }
+
+      onEdit(data) {
+        this.editsCount++;
+        this.lastTitle = `${data.title} (${data.wiki || 'wiki'})`;
+        const isBot = data.bot || false;
+        if (isBot) this.botEdits++; else this.humanEdits++;
+
+        const now = performance.now();
+        this.rateWindow.push(now);
+        while (this.rateWindow.length && now - this.rateWindow[0] > 2000) this.rateWindow.shift();
+
+        this.recentEditsList.push({
+          title: data.title,
+          time: now,
+          isBot,
+          pan: (Math.random() * 1.6) - 0.8
+        });
+        if (this.recentEditsList.length > 25) this.recentEditsList.shift();
+
+        if (!this.engine || !this.engine.isPlaying) return;
+
+        // recentchange supera i 30 eventi/s: una nota per edit era rumore bianco,
+        // piu' decine di nodi audio al secondo mai liberati. Qui il flusso diventa ritmo.
+        const sens = this.engine.sensitivity || 1.5;
+        if (now - this.lastNoteTime < 1000 / (2 + sens * 2.5)) return;
+        this.lastNoteTime = now;
+
+        const byteDiff = Math.abs((data.length?.new || 0) - (data.length?.old || 0));
+        // Byte modificati -> registro: micro-refuso acuto, revisione massiccia grave
+        const octave = byteDiff > 2000 ? 1 : byteDiff > 200 ? 2 : 4;
+        const freq = this.engine.degreeFreq(byteDiff % 7, octave);
+        const pan = (Math.random() * 1.6) - 0.8;
+        this.engine.triggerNote(freq, pan, isBot ? 0.22 : 1.6, isBot ? 'glitch' : 'bell');
+      }
+
+      update() {
+        const total = Math.max(1, this.humanEdits + this.botEdits);
+        const humanPct = Math.round((this.humanEdits / total) * 100);
+        const now = performance.now();
+        while (this.rateWindow.length && now - this.rateWindow[0] > 2000) this.rateWindow.shift();
+        const eps = this.rateWindow.length / 2;
+
+        if (this.engine && this.engine.isPlaying) {
+          // Traffico globale -> brillantezza: la wiki che si sveglia apre il filtro
+          this.engine.setBrightness(0.3 + Math.min(0.7, eps / 40), 0.4);
+          // Rapporto umani/bot -> colore armonico (maggiore / minore / cluster dissonante)
+          const h = humanPct / 100;
+          this.engine.setChord(h > 0.6 ? [0, 4, 7, 11] : h > 0.35 ? [0, 3, 7, 10] : [0, 1, 5, 8], 0.9);
+          this.engine.reverbGain.gain.setTargetAtTime(0.25 + h * 0.4, this.engine.ctx.currentTime, 0.5);
+        }
+
+        return {
+          c1: { title: 'WIKIPEDIA EDITS', val: this.editsCount, unit: 'modifiche', badge: 'STREAM LIVE', meter: Math.min(100, (this.editsCount % 100)), map: 'Note armoniche generate' },
+          c2: { title: 'HUMAN RATIO', val: humanPct, unit: '%', badge: `${this.humanEdits} HUM / ${this.botEdits} BOT`, meter: humanPct, map: 'Campane per umani, glitch per bot' },
+          c3: { title: 'FLUSSO KNOWLEDGE', val: eps.toFixed(1), unit: 'ev/sec', badge: 'ACTIVE SSE', meter: Math.min(100, eps * 2.5), map: 'Brillantezza del filtro' },
+          c4: { title: 'WIKI NETWORK', val: 'GLOBAL', unit: 'nodes', badge: 'WIKIMEDIA', meter: 95, map: 'Spazializzazione stereo' },
+          ticker: `Wikipedia Live: "${this.lastTitle}"`
+        };
+      }
+    }
+
+    // PROVIDER 3: Lorenz Chaos Attractor
+    class LorenzChaos {
+      constructor(engine) {
+        this.engine = engine;
+        this.x = 0.1;
+        this.y = 0;
+        this.z = 0;
+        this.sigma = 10;
+        this.rho = 28;
+        this.beta = 8 / 3;
+        this.dt = 0.009;
+        this.history = [];
+      }
+
+      update() {
+        for (let i = 0; i < 4; i++) {
+          const dx = this.sigma * (this.y - this.x) * this.dt;
+          const dy = (this.x * (this.rho - this.z) - this.y) * this.dt;
+          const dz = ((this.x * this.y) - (this.beta * this.z)) * this.dt;
+          this.x += dx;
+          this.y += dy;
+          this.z += dz;
+        }
+
+        this.history.push({ x: this.x, y: this.y, z: this.z });
+        if (this.history.length > 220) this.history.shift();
+
+        if (this.engine && this.engine.isPlaying) {
+          const now = this.engine.ctx.currentTime;
+          const sens = this.engine.sensitivity || 1.5;
+          this.engine.setBrightness(Math.min(1, Math.max(0, (this.x + 22) / 44)), 0.08);
+
+          const normZ = Math.min(1, Math.max(0, this.z / 50));
+          // Clamp a 0.55: oltre, con il ping-pong, l'anello si autoalimenta
+          this.engine.delayFeedback.gain.setTargetAtTime(0.2 + (normZ * 0.35), now, 0.1);
+
+          // Fasce di quota Z -> accordi diversi. Il caos diventa movimento armonico,
+          // non solo un cutoff che oscilla: la differenza si sente anche a occhi chiusi.
+          const band = Math.min(3, Math.floor(normZ * 4));
+          this.engine.setChord([[0, 3, 7, 10], [0, 2, 5, 9], [0, 4, 7, 11], [0, 1, 6, 8]][band], 0.6);
+
+          // Rileva salto tra le ali della farfalla (Lobe Transition) per note ritmiche caotiche
+          const curSign = Math.sign(this.x);
+          if (this.lastSign !== undefined && curSign !== 0 && curSign !== this.lastSign) {
+            this.engine.triggerNote(this.engine.degreeFreq(Math.floor(normZ * 7), 2), curSign * 0.8, 0.9, 'pluck');
+          }
+          this.lastSign = curSign;
+
+          this.engine.voices.forEach((v, idx) => {
+            const detune = Math.sin(this.y * 0.25 + idx) * (14 * sens);
+            v.osc.detune.setTargetAtTime(detune, now, 0.1);
+          });
+        }
+
+        return {
+          c1: { title: 'LORENZ COORDINATA X', val: this.x.toFixed(1), unit: 'pos', badge: 'CHAOS ORBIT', meter: Math.min(100, Math.abs(this.x) * 3.5), map: 'Brillantezza del filtro' },
+          c2: { title: 'LORENZ COORDINATA Y', val: this.y.toFixed(1), unit: 'vel', badge: 'ATTRACTOR', meter: Math.min(100, Math.abs(this.y) * 3.5), map: 'Transizioni tra ali della farfalla' },
+          c3: { title: 'LORENZ COORDINATA Z', val: this.z.toFixed(1), unit: 'alt', badge: 'NON-LINEAR', meter: Math.min(100, (this.z / 50) * 100), map: 'Accordo del drone e delay feedback' },
+          c4: { title: 'TEORIA DEL CAOS', val: 'DEEP', unit: 'fractal', badge: '60 FPS MATH', meter: 88, map: 'Zero ripetizione melodica' },
+          ticker: `Attrattore Caotico di Lorenz: X=${this.x.toFixed(2)} | Y=${this.y.toFixed(2)} | Z=${this.z.toFixed(2)} // Traiettoria infinita deterministica`
+        };
+      }
+    }
+
+    // PROVIDER 4: ISS Orbit Live
+    class IssOrbit {
+      constructor(engine) {
+        this.engine = engine;
+        this.lat = 0;
+        this.lon = 0;
+        this.altitude = 418;
+        this.velocity = 27600;
+        this.visibility = 'daylight';
+        this.lastFetch = 0;
+        this.lastPulse = 0;
+        this.fetchISS();
+      }
+
+      async fetchISS() {
+        try {
+          const res = await fetch('https://api.wheretheiss.at/v1/satellites/25544');
+          if (res.ok) {
+            const data = await res.json();
+            this.lat = data.latitude;
+            this.lon = data.longitude;
+            this.altitude = Math.round(data.altitude);
+            this.velocity = Math.round(data.velocity);
+            this.visibility = data.visibility;
+          }
+        } catch (e) {
+          this.lon = (this.lon + 0.35) % 360;
+          if (this.lon > 180) this.lon -= 360;
+          this.lat = Math.sin(performance.now() * 0.0001) * 51.6;
+        }
+      }
+
+      update() {
+        const now = performance.now();
+        if (now - this.lastFetch > 4000) {
+          this.fetchISS();
+          this.lastFetch = now;
+        }
+
+        if (this.engine && this.engine.isPlaying) {
+          const audioNow = this.engine.ctx.currentTime;
+          const sens = this.engine.sensitivity || 1.5;
+          const isDay = this.visibility === 'daylight';
+
+          // Sole vs ombra terrestre: salto di brillantezza netto, si sente all'istante
+          this.engine.setBrightness(isDay ? 0.9 : 0.08, 0.6);
+          this.engine.reverbGain.gain.setTargetAtTime(isDay ? 0.3 : 0.75, audioNow, 0.6);
+
+          // Latitudine -> accordo: ai poli armonia tesa, all'equatore aperta
+          const absLat = Math.abs(this.lat);
+          this.engine.setChord(absLat > 40 ? [0, 1, 5, 8] : absLat > 18 ? [0, 3, 7, 10] : [0, 4, 7, 9], 0.9);
+
+          // Impulso telemetrico orbitale Doppler a 27.600 km/h
+          const pulseInterval = Math.max(200, 700 / sens);
+          if (!this.lastPulse || (now - this.lastPulse > pulseInterval)) {
+            this.lastPulse = now;
+            const pan = Math.max(-1, Math.min(1, this.lon / 180));
+            this.engine.triggerNote(
+              this.engine.degreeFreq(Math.floor(absLat / 12), isDay ? 4 : 1),
+              pan, isDay ? 0.9 : 2.0, isDay ? 'bell' : 'pluck'
+            );
+          }
+        }
+
+        const isDay = this.visibility === 'daylight';
+        return {
+          c1: { title: 'ISS LATITUDINE', val: this.lat.toFixed(2), unit: '°', badge: 'ORBITAL', meter: Math.min(100, Math.abs(this.lat) * 1.9), map: 'Accordo del drone (fascia polare)' },
+          c2: { title: 'ISS LONGITUDINE', val: this.lon.toFixed(2), unit: '°', badge: 'COORDINATES', meter: Math.min(100, ((this.lon + 180) / 360) * 100), map: 'Inclinazione Spazio Stereo' },
+          c3: { title: 'QUOTA ORBITALE', val: this.altitude, unit: 'km', badge: 'THERMOSPHERE', meter: 72, map: 'Coda del riverbero' },
+          c4: { title: 'LUCE SOLARE', val: isDay ? 'DAY' : 'ECLIPSE', unit: 'phase', badge: isDay ? 'SUNLIGHT' : 'EARTH SHADOW', meter: isDay ? 100 : 20, map: isDay ? 'Campane Celestiali' : 'Sub-Bass Drone Siderale' },
+          ticker: `ISS Space Station: Lat ${this.lat.toFixed(2)}°, Lon ${this.lon.toFixed(2)}° | Quota: ${this.altitude} km | Velocità: ${this.velocity} km/h | ${isDay ? 'Luce Solare Diretta' : 'Ombra Terrestre'}`
+        };
+      }
+    }
+
+    // PROVIDER 5: Earth Seismic Activity (USGS Live)
+    class EarthquakeFeed {
+      constructor(engine) {
+        this.engine = engine;
+        this.lastEvent = null;
+        this.count = 0;
+        this.maxMag = 0;
+        this.lastFetch = 0;
+        this.lastScan = 0;
+        this.scanIdx = 0;
+        this.catalog = [];
+        this.recentEvents = [];
+        this.activePlace = 'Scansione sismica globale in corso...';
+        this.fetchQuakes();
+      }
+
+      async fetchQuakes() {
+        try {
+          const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson');
+          if (res.ok) {
+            const data = await res.json();
+            this.count = data.features.length;
+            if (this.count > 0) {
+              this.catalog = data.features.map(f => ({
+                id: f.id,
+                mag: f.properties.mag || 1.5,
+                place: f.properties.place || 'Oceano',
+                lon: f.geometry.coordinates[0],
+                lat: f.geometry.coordinates[1],
+                time: performance.now()
+              }));
+              this.maxMag = Math.max(...this.catalog.map(q => q.mag));
+            }
+          }
+        } catch (e) {}
+      }
+
+      update() {
+        const now = performance.now();
+        if (this.recentEvents) this.recentEvents = this.recentEvents.filter(ev => (now - ev.time) < 6000);
+        if (now - this.lastFetch > 20000) {
+          this.fetchQuakes();
+          this.lastFetch = now;
+        }
+
+        const sens = this.engine ? (this.engine.sensitivity || 1.5) : 1.5;
+        const scanInterval = Math.max(1200, 3200 / sens);
+
+        if (this.engine && this.engine.isPlaying) {
+          // Sismicita' oraria -> brillantezza; pianeta calmo = drone cupo
+          this.engine.setBrightness(0.3 + Math.min(0.6, this.count / 45), 0.6);
+          // Magnitudo massima dell'ora -> tensione armonica
+          this.engine.setChord(this.maxMag >= 5 ? [0, 1, 4, 7] : this.maxMag >= 3.5 ? [0, 2, 5, 9] : [0, 3, 7, 10], 1.2);
+        }
+
+        // Ciclo continuo sui terremoti reali del pianeta per variazioni ritmiche audibili
+        if (this.catalog.length > 0 && (!this.lastScan || (now - this.lastScan > scanInterval))) {
+          this.lastScan = now;
+          this.scanIdx = (this.scanIdx + 1) % this.catalog.length;
+          const q = this.catalog[this.scanIdx];
+          this.lastEvent = q;
+          // Il timestamp di q risale al fetch: riusandolo, l'onda d'urto nasceva
+          // gia' scaduta e il visualizer non disegnava mai nulla.
+          this.recentEvents.push({ ...q, time: now });
+          this.activePlace = `${q.place} (M${q.mag.toFixed(1)})`;
+
+          if (this.engine && this.engine.isPlaying) {
+            const pan = Math.max(-1, Math.min(1, q.lon / 180));
+            const basePitch = this.engine.activeScale.base * (q.mag > 3.0 ? 0.75 : 1.5);
+            this.engine.triggerSubGong(basePitch, 1.8 + (q.mag * 0.7 * sens), pan);
+            // Sopra M4.5 il gong prende una campana acuta: la scossa forte si distingue
+            if (q.mag > 4.5) {
+              this.engine.triggerNote(this.engine.degreeFreq(Math.round(q.mag) % 7, 4), -pan, 2.6, 'bell');
+            }
+          }
+        }
+
+        return {
+          c1: { title: 'TERREMOTI RECENTI', val: this.count, unit: 'scosse/ora', badge: `MAX M${this.maxMag.toFixed(1)}`, meter: Math.min(100, this.count * 4), map: 'Brillantezza e accordo del drone' },
+          c2: { title: 'MAGNITUDO SCAN', val: this.lastEvent ? this.lastEvent.mag.toFixed(1) : '--', unit: 'Richter', badge: 'SEISMIC', meter: this.lastEvent ? Math.min(100, (this.lastEvent.mag / 7) * 100) : 30, map: 'Risonanza e profondità gong' },
+          c3: { title: 'EPICENTRO STEREO', val: this.lastEvent ? `${this.lastEvent.lon.toFixed(0)}°` : '0°', unit: 'lon', badge: 'GEOPHYSICAL', meter: 50, map: 'Posizionamento stereo Panner' },
+          c4: { title: 'ATTIVITÀ CROSTA', val: 'LIVE', unit: 'radar', badge: 'EARTH CRUST', meter: 75, map: 'Rimbombo a bassa frequenza' },
+          ticker: `Sismologia Planetaria USGS: [Rilevamento] ${this.activePlace}`
+        };
+      }
+    }
+
+    // PROVIDER 6: Conway's Game of Life (Cellular Automata)
+    class GameOfLifeEngine {
+      constructor(engine) {
+        this.engine = engine;
+        this.cols = 24;
+        this.rows = 16;
+        this.grid = this.createGrid();
+        this.randomize();
+        this.generation = 0;
+        this.liveCount = 0;
+        this.lastStep = 0;
+      }
+
+      createGrid() {
+        return Array.from({ length: this.rows }, () => Array(this.cols).fill(0));
+      }
+
+      randomize() {
+        for (let r = 0; r < this.rows; r++) {
+          for (let c = 0; c < this.cols; c++) {
+            this.grid[r][c] = Math.random() > 0.72 ? 1 : 0;
+          }
+        }
+      }
+
+      step() {
+        const next = this.createGrid();
+        let alive = 0;
+        let triggeredNotes = 0;
+
+        for (let r = 0; r < this.rows; r++) {
+          for (let c = 0; c < this.cols; c++) {
+            let neighbors = 0;
+            for (let i = -1; i <= 1; i++) {
+              for (let j = -1; j <= 1; j++) {
+                if (i === 0 && j === 0) continue;
+                const nr = (r + i + this.rows) % this.rows;
+                const nc = (c + j + this.cols) % this.cols;
+                neighbors += this.grid[nr][nc];
+              }
+            }
+
+            const state = this.grid[r][c];
+            if (state === 1 && (neighbors === 2 || neighbors === 3)) {
+              next[r][c] = 1;
+              alive++;
+            } else if (state === 0 && neighbors === 3) {
+              next[r][c] = 1; // Birth
+              alive++;
+              // Max 2 note per generazione: a 3*sens erano fino a ~90 note/s, cioe' rumore
+              if (this.engine && this.engine.isPlaying && triggeredNotes < 2) {
+                const octave = Math.pow(2, Math.floor(r / 6));
+                const pan = (c / this.cols) * 1.6 - 0.8;
+                this.engine.triggerNote(this.engine.degreeFreq(c % 7, octave * 2), pan, 0.7, 'pluck');
+                triggeredNotes++;
+              }
+            } else {
+              next[r][c] = 0;
+            }
+          }
+        }
+
+        this.grid = next;
+        this.generation++;
+        this.liveCount = alive;
+
+        if (alive < 12 || alive > (this.cols * this.rows * 0.75)) {
+          this.randomize();
+        }
+      }
+
+      update() {
+        const now = performance.now();
+        const sens = this.engine ? (this.engine.sensitivity || 1.5) : 1.5;
+        const stepRate = Math.max(150, 320 / sens);
+        if (now - this.lastStep > stepRate) {
+          this.step();
+          this.lastStep = now;
+        }
+
+        const totalCells = this.cols * this.rows;
+        const livePct = Math.round((this.liveCount / totalCells) * 100);
+
+        if (this.engine && this.engine.isPlaying) {
+          const dens = this.liveCount / totalCells;
+          // Densita' della colonia -> brillantezza e accordo: la crescita e il collasso
+          // della popolazione si sentono come apertura/chiusura e cambio di armonia.
+          this.engine.setBrightness(0.2 + Math.min(0.8, dens * 2.6), 0.25);
+          this.engine.setChord(dens > 0.28 ? [0, 2, 4, 6] : dens > 0.15 ? [0, 3, 7, 10] : [0, 7, 11, 14], 0.7);
+        }
+
+        return {
+          c1: { title: 'CELLULE VIVE', val: this.liveCount, unit: 'organismi', badge: 'LIFE ACTIVE', meter: livePct * 2, map: 'Trigger arpeggi poliritmici' },
+          c2: { title: 'GENERAZIONE', val: this.generation, unit: 'ciclo', badge: 'AUTOMATA', meter: (this.generation % 100), map: 'Evoluzione genetica continua' },
+          c3: { title: 'DENSITÀ MATRICE', val: livePct, unit: '%', badge: `${this.cols}x${this.rows} GRID`, meter: livePct, map: 'Accordo del drone e brillantezza' },
+          c4: { title: 'VITA ARTIFICIALE', val: 'CONWAY', unit: 'rules', badge: 'BIO-ALGO', meter: 80, map: 'Spazializzazione X/Y' },
+          ticker: `Game of Life: Generazione ${this.generation} | ${this.liveCount} cellule attive in divisione genetica`
+        };
+      }
+    }
+
+    // PROVIDER 7: Atmosphere & Wind (Open-Meteo)
+    class AtmosphereEngine {
+      constructor(engine) {
+        this.engine = engine;
+        this.temp = 24.5;
+        this.windSpeed = 8.5;
+        this.pressure = 1013.2;
+        this.lastFetch = 0;
+        this.lastChime = 0;
+        this.fetchAtmosphere();
+      }
+
+      async fetchAtmosphere() {
+        try {
+          const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=41.9&longitude=12.5&current=temperature_2m,surface_pressure,wind_speed_10m');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.current) {
+              this.temp = data.current.temperature_2m;
+              this.windSpeed = data.current.wind_speed_10m;
+              this.pressure = data.current.surface_pressure;
+            }
+          }
+        } catch (e) {}
+      }
+
+      update() {
+        const now = performance.now();
+        if (now - this.lastFetch > 30000) {
+          this.fetchAtmosphere();
+          this.lastFetch = now;
+        }
+
+        if (this.engine && this.engine.isPlaying) {
+          const audioNow = this.engine.ctx.currentTime;
+          const sens = this.engine.sensitivity || 1.5;
+          // Due sinusoidi sfasate: raffiche irregolari, non un LFO che si riconosce
+          const gust = 0.5 + Math.sin(now * 0.0009) * 0.35 + Math.sin(now * 0.0031) * 0.15;
+          const windNorm = Math.min(1, this.windSpeed / 45);
+
+          // Vento -> brillantezza che respira + tremolo: la raffica si sente, non si deduce
+          this.engine.setBrightness(0.2 + Math.min(0.8, windNorm * 0.35 + gust * 0.45), 0.3);
+          this.engine.setTremolo(0.25 + windNorm * 2.5, windNorm * 0.45);
+
+          // Bassa pressione -> coda lunga e cupa (temporale in arrivo)
+          const pressNorm = Math.max(0, Math.min(1, (this.pressure - 980) / 50));
+          this.engine.reverbGain.gain.setTargetAtTime(0.15 + ((1 - pressNorm) * 0.55), audioNow, 0.5);
+
+          // Temperatura -> accordo: freddo minore/sospeso, caldo maggiore aperto
+          this.engine.setChord(this.temp < 8 ? [0, 3, 7, 10] : this.temp < 22 ? [0, 2, 7, 9] : [0, 4, 7, 11], 1.0);
+
+          // Campane eoliche cristalline innescate dalle raffiche di vento
+          const chimeInterval = Math.max(220, 2200 / (Math.max(2, this.windSpeed) * sens * 0.6));
+          if (!this.lastChime || (now - this.lastChime > chimeInterval)) {
+            this.lastChime = now;
+            const pan = Math.sin(now * 0.002) * 0.85; // prima usciva da [-1,1] e restava incollato ai bordi
+            this.engine.triggerNote(this.engine.degreeFreq(Math.floor(Math.random() * 7), 4), pan, 1.4, 'bell');
+          }
+        }
+
+        return {
+          c1: { title: 'VELOCITÀ DEL VENTO', val: this.windSpeed, unit: 'km/h', badge: 'RAFFICHE LIVE', meter: Math.min(100, this.windSpeed * 3.5), map: 'Brillantezza e tremolo' },
+          c2: { title: 'PRESSIONE BAROMETRICA', val: this.pressure.toFixed(0), unit: 'hPa', badge: 'ISOBARIC', meter: Math.min(100, (this.pressure - 970) * 1.5), map: 'Profondità del riverbero' },
+          c3: { title: 'CAMPANE EOLICHE', val: 'ACTIVE', unit: 'chimes', badge: 'WIND HARMONICS', meter: 85, map: 'Note cristalline nel vento' },
+          c4: { title: 'TEMPERATURA ARIA', val: this.temp.toFixed(1), unit: '°C', badge: 'GLOBAL METEO', meter: Math.min(100, (this.temp + 10) * 2), map: 'Accordo del drone' },
+          ticker: `Meteo & Atmosfera Terrestre: Vento ${this.windSpeed} km/h (raffiche attive) | Pressione ${this.pressure.toFixed(0)} hPa | Temperatura ${this.temp}°C`
+        };
+      }
+    }
+
+    // Unified Visualizer Renderer
+    class VisualizerRenderer {
+      constructor(canvas, engine) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.engine = engine;
+        this.currentSource = 'device';
+        this.dataArray = null;
+
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+      }
+
+      resize() {
+        const dpr = window.devicePixelRatio || 1;
+        this.width = this.canvas.clientWidth;
+        this.height = this.canvas.clientHeight;
+        this.canvas.width = this.width * dpr;
+        this.canvas.height = this.height * dpr;
+        this.ctx.scale(dpr, dpr);
+      }
+
+      draw(providers) {
+        requestAnimationFrame(() => this.draw(providers));
+        const w = this.width;
+        const h = this.height;
+        const cx = w / 2;
+        const cy = h / 2;
+
+        this.ctx.fillStyle = 'rgba(7, 9, 14, 0.28)';
+        this.ctx.fillRect(0, 0, w, h);
+
+        const time = performance.now() * 0.001;
+
+        if (this.engine.analyser && this.engine.isPlaying) {
+          if (!this.dataArray) this.dataArray = new Uint8Array(this.engine.analyser.frequencyBinCount);
+          this.engine.analyser.getByteFrequencyData(this.dataArray);
+        }
+
+        switch(this.currentSource) {
+          case 'device':
+            this.drawDevice(cx, cy, w, h, time, providers.device);
+            break;
+          case 'wikipedia':
+            this.drawWikipedia(cx, cy, w, h, time, providers.wiki);
+            break;
+          case 'lorenz':
+            this.drawLorenz(cx, cy, w, h, time, providers.lorenz);
+            break;
+          case 'iss':
+            this.drawIss(cx, cy, w, h, time, providers.iss);
+            break;
+          case 'earthquake':
+            this.drawEarthquake(cx, cy, w, h, time, providers.quake);
+            break;
+          case 'gameoflife':
+            this.drawGameOfLife(cx, cy, w, h, time, providers.life);
+            break;
+          case 'atmosphere':
+            this.drawAtmosphere(cx, cy, w, h, time, providers.atmo);
+            break;
+        }
+      }
+
+      drawDevice(cx, cy, w, h, time, deviceMon) {
+        const coreCount = this.engine.voices.length || deviceMon.cores;
+        const baseRadius = Math.min(w, h) * 0.26;
+
+        this.ctx.save();
+        this.ctx.translate(cx, cy);
+
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+        this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.08)';
+        this.ctx.lineWidth = 1;
+        this.ctx.stroke();
+
+        if (this.dataArray && this.engine.isPlaying) {
+          const bars = 64;
+          for (let i = 0; i < bars; i++) {
+            const angle = (i / bars) * Math.PI * 2;
+            const val = this.dataArray[i * 4] / 255;
+            const rayLen = val * (baseRadius * 0.65);
+            const x1 = Math.cos(angle) * (baseRadius - 4);
+            const y1 = Math.sin(angle) * (baseRadius - 4);
+            const x2 = Math.cos(angle) * (baseRadius + rayLen);
+            const y2 = Math.sin(angle) * (baseRadius + rayLen);
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(x1, y1);
+            this.ctx.lineTo(x2, y2);
+            this.ctx.strokeStyle = `hsla(${185 + (val * 80)}, 100%, 65%, ${0.2 + (val * 0.6)})`;
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+          }
+        }
+
+        for (let i = 0; i < coreCount; i++) {
+          const angle = (i / coreCount) * Math.PI * 2 + (time * 0.15);
+          const dist = baseRadius + Math.sin(time * 1.5 + i) * 6;
+          const nx = Math.cos(angle) * dist;
+          const ny = Math.sin(angle) * dist;
+
+          let size = 5;
+          if (this.engine.voices[i]) size = 5 + (this.engine.voices[i].gain.gain.value * 25);
+
+          this.ctx.beginPath();
+          this.ctx.arc(nx, ny, size * 2.2, 0, Math.PI * 2);
+          this.ctx.fillStyle = 'rgba(0, 240, 255, 0.12)';
+          this.ctx.fill();
+
+          this.ctx.beginPath();
+          this.ctx.arc(nx, ny, size, 0, Math.PI * 2);
+          this.ctx.fillStyle = '#00f0ff';
+          this.ctx.shadowColor = '#00f0ff';
+          this.ctx.shadowBlur = 10;
+          this.ctx.fill();
+          this.ctx.shadowBlur = 0;
+        }
+
+        this.ctx.restore();
+      }
+
+      drawWikipedia(cx, cy, w, h, time, wikiStream) {
+        this.ctx.save();
+        this.ctx.translate(cx, cy);
+
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 35 + Math.sin(time * 2) * 5, 0, Math.PI * 2);
+        this.ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+
+        const edits = wikiStream.recentEditsList;
+        const now = performance.now();
+        edits.forEach((item, idx) => {
+          const age = (now - item.time) / 1000;
+          if (age > 4) return;
+          const dist = 50 + (age * 60);
+          const angle = (idx * 1.35) + (item.pan * 2);
+          const px = Math.cos(angle) * dist;
+          const py = Math.sin(angle) * dist;
+          const alpha = Math.max(0, 1 - (age / 4));
+
+          this.ctx.beginPath();
+          this.ctx.arc(px, py, item.isBot ? 3 : 6, 0, Math.PI * 2);
+          this.ctx.fillStyle = item.isBot ? `rgba(0, 255, 170, ${alpha})` : `rgba(0, 240, 255, ${alpha})`;
+          this.ctx.fill();
+
+          if (!item.isBot && age < 1.5) {
+            this.ctx.font = '10px JetBrains Mono';
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
+            this.ctx.fillText(item.title.substring(0, 18), px + 8, py + 3);
+          }
+        });
+
+        this.ctx.restore();
+      }
+
+      drawLorenz(cx, cy, w, h, time, lorenz) {
+        this.ctx.save();
+        this.ctx.translate(cx, cy + 20);
+
+        const rotY = time * 0.3;
+        const pts = lorenz.history;
+
+        if (pts.length > 2) {
+          this.ctx.beginPath();
+          pts.forEach((p, idx) => {
+            const zNorm = p.z - 25;
+            const rx = (p.x * Math.cos(rotY)) - (zNorm * Math.sin(rotY));
+            const rz = (p.x * Math.sin(rotY)) + (zNorm * Math.cos(rotY));
+            const scale = 300 / (300 + rz * 3);
+            const sx = rx * 6.5 * scale;
+            const sy = -p.y * 6.5 * scale;
+
+            if (idx === 0) this.ctx.moveTo(sx, sy);
+            else this.ctx.lineTo(sx, sy);
+          });
+          this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+          this.ctx.lineWidth = 1.5;
+          this.ctx.stroke();
+
+          const last = pts[pts.length - 1];
+          const zNorm = last.z - 25;
+          const rx = (last.x * Math.cos(rotY)) - (zNorm * Math.sin(rotY));
+          const rz = (last.x * Math.sin(rotY)) + (zNorm * Math.cos(rotY));
+          const scale = 300 / (300 + rz * 3);
+          const sx = rx * 6.5 * scale;
+          const sy = -last.y * 6.5 * scale;
+
+          this.ctx.beginPath();
+          this.ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+          this.ctx.fillStyle = '#00ffaa';
+          this.ctx.shadowColor = '#00ffaa';
+          this.ctx.shadowBlur = 15;
+          this.ctx.fill();
+          this.ctx.shadowBlur = 0;
+        }
+
+        this.ctx.restore();
+      }
+
+      drawIss(cx, cy, w, h, time, iss) {
+        this.ctx.save();
+        this.ctx.translate(cx, cy);
+
+        const r = Math.min(w, h) * 0.28;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+        this.ctx.fill();
+        this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+
+        this.ctx.beginPath();
+        this.ctx.ellipse(0, 0, r * 1.25, r * 0.55, -0.4, 0, Math.PI * 2);
+        this.ctx.strokeStyle = 'rgba(168, 85, 247, 0.35)';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.stroke();
+
+        const satAngle = ((iss.lon + 180) / 360) * Math.PI * 2;
+        const sx = Math.cos(satAngle) * (r * 1.25);
+        const sy = Math.sin(satAngle) * (r * 0.55);
+
+        const inc = -0.4;
+        const rx = (sx * Math.cos(inc)) - (sy * Math.sin(inc));
+        const ry = (sx * Math.sin(inc)) + (sy * Math.cos(inc));
+
+        this.ctx.beginPath();
+        this.ctx.arc(rx, ry, 7, 0, Math.PI * 2);
+        this.ctx.fillStyle = iss.visibility === 'daylight' ? '#f59e0b' : '#00f0ff';
+        this.ctx.shadowColor = this.ctx.fillStyle;
+        this.ctx.shadowBlur = 15;
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
+
+        this.ctx.font = '10px JetBrains Mono';
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillText('ISS // 27,600 km/h', rx + 12, ry + 4);
+
+        this.ctx.restore();
+      }
+
+      drawEarthquake(cx, cy, w, h, time, quake) {
+        this.ctx.save();
+        this.ctx.translate(cx, cy);
+
+        // World seismic circular sonar
+        const r = Math.min(w, h) * 0.28;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+        this.ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.stroke();
+
+        // Expanding shockwaves
+        const now = performance.now();
+        quake.recentEvents.forEach(ev => {
+          const age = (now - ev.time) / 1000;
+          if (age > 6) return;
+          const waveRadius = (age / 6) * r * 1.5;
+          const alpha = Math.max(0, 1 - (age / 6));
+
+          this.ctx.beginPath();
+          this.ctx.arc(0, 0, waveRadius, 0, Math.PI * 2);
+          this.ctx.strokeStyle = `rgba(239, 68, 68, ${alpha * 0.8})`;
+          this.ctx.lineWidth = 2 + (ev.mag * 0.8);
+          this.ctx.stroke();
+        });
+
+        // Center tectonic core
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        this.ctx.fillStyle = '#f59e0b';
+        this.ctx.shadowColor = '#f59e0b';
+        this.ctx.shadowBlur = 15;
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
+
+        this.ctx.restore();
+      }
+
+      drawGameOfLife(cx, cy, w, h, time, life) {
+        const cellW = (w * 0.7) / life.cols;
+        const cellH = (h * 0.7) / life.rows;
+        const startX = cx - (life.cols * cellW) / 2;
+        const startY = cy - (life.rows * cellH) / 2;
+
+        this.ctx.save();
+        for (let r = 0; r < life.rows; r++) {
+          for (let c = 0; c < life.cols; c++) {
+            if (life.grid[r][c] === 1) {
+              this.ctx.fillStyle = 'rgba(0, 255, 170, 0.75)';
+              this.ctx.shadowColor = '#00ffaa';
+              this.ctx.shadowBlur = 8;
+              this.ctx.fillRect(startX + c * cellW, startY + r * cellH, cellW - 2, cellH - 2);
+            } else {
+              this.ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+              this.ctx.fillRect(startX + c * cellW, startY + r * cellH, cellW - 2, cellH - 2);
+            }
+          }
+        }
+        this.ctx.shadowBlur = 0;
+        this.ctx.restore();
+      }
+
+      drawAtmosphere(cx, cy, w, h, time, atmo) {
+        this.ctx.save();
+        this.ctx.translate(cx, cy);
+
+        // Wind flow streamlines
+        const count = 36;
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * Math.PI * 2;
+          const rad = 60 + Math.sin(time * 2 + i) * 45;
+          const speed = atmo.windSpeed * 0.1;
+          const flowAngle = angle + (time * speed);
+
+          const x = Math.cos(flowAngle) * rad;
+          const y = Math.sin(flowAngle) * (rad * 0.55);
+
+          this.ctx.beginPath();
+          this.ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+          this.ctx.fillStyle = 'rgba(0, 240, 255, 0.6)';
+          this.ctx.fill();
+        }
+
+        // Central barometer pulse
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 28, 0, Math.PI * 2);
+        this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+        this.ctx.stroke();
+
+        this.ctx.font = '11px JetBrains Mono';
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`${atmo.pressure.toFixed(0)} hPa`, 0, 4);
+
+        this.ctx.restore();
+      }
+    }
+
+    // MAIN APP ORCHESTRATOR
+    document.addEventListener('DOMContentLoaded', () => {
+      const engine = new CabasaAudioEngine();
+      const providers = {
+        device: new DeviceMonitor(),
+        wiki: new WikipediaStream(engine),
+        lorenz: new LorenzChaos(engine),
+        iss: new IssOrbit(engine),
+        quake: new EarthquakeFeed(engine),
+        life: new GameOfLifeEngine(engine),
+        atmo: new AtmosphereEngine(engine)
+      };
+
+      window.cabasa = { engine, providers, SCALES, KITS }; // handle di debug: ispeziona accordo, cutoff, polifonia
+
+      const canvas = document.getElementById('visualizer-canvas');
+      const renderer = new VisualizerRenderer(canvas, engine);
+
+      // DOM Elements
+      const btnMasterStart = document.getElementById('btn-master-start');
+      const transportOverlay = document.getElementById('transport-overlay');
+      const globalStatusDot = document.getElementById('global-status-dot');
+      const globalStatusText = document.getElementById('global-status-text');
+      const btnTogglePlay = document.getElementById('btn-toggle-play');
+      const togglePlayLabel = document.getElementById('toggle-play-label');
+      const sliderVolume = document.getElementById('slider-volume');
+      const volumeVal = document.getElementById('volume-val');
+      const selectMood = document.getElementById('select-mood');
+      const btnFullscreen = document.getElementById('btn-fullscreen');
+      const hudSource = document.getElementById('hud-source');
+      const hudEngine = document.getElementById('hud-engine');
+      const hudPolyphony = document.getElementById('hud-polyphony');
+      const hudScale = document.getElementById('hud-scale');
+      const tickerText = document.getElementById('ticker-text');
+
+      // Card Elements
+      const c1Title = document.getElementById('c1-title');
+      const c1Val = document.getElementById('c1-val');
+      const c1Unit = document.getElementById('c1-unit');
+      const c1Badge = document.getElementById('c1-badge');
+      const c1Meter = document.getElementById('c1-meter');
+      const c1Map = document.getElementById('c1-map');
+
+      const c2Title = document.getElementById('c2-title');
+      const c2Val = document.getElementById('c2-val');
+      const c2Unit = document.getElementById('c2-unit');
+      const c2Badge = document.getElementById('c2-badge');
+      const c2Meter = document.getElementById('c2-meter');
+      const c2Map = document.getElementById('c2-map');
+
+      const c3Title = document.getElementById('c3-title');
+      const c3Val = document.getElementById('c3-val');
+      const c3Unit = document.getElementById('c3-unit');
+      const c3Badge = document.getElementById('c3-badge');
+      const c3Meter = document.getElementById('c3-meter');
+      const c3Map = document.getElementById('c3-map');
+
+      const c4Title = document.getElementById('c4-title');
+      const c4Val = document.getElementById('c4-val');
+      const c4Unit = document.getElementById('c4-unit');
+      const c4Badge = document.getElementById('c4-badge');
+      const c4Meter = document.getElementById('c4-meter');
+      const c4Map = document.getElementById('c4-map');
+
+      let activeSource = 'device';
+
+      // Source Tabs
+      document.querySelectorAll('.source-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const target = tab.getAttribute('data-source');
+          if (target === activeSource) return;
+
+          document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+
+          if (activeSource === 'wikipedia') providers.wiki.stop();
+
+          activeSource = target;
+          renderer.currentSource = target;
+          engine.resetModulation();
+          hudSource.textContent = tab.textContent.trim().toUpperCase();
+
+          if (activeSource === 'wikipedia') providers.wiki.start();
+        });
+      });
+
+      // Master Start
+      btnMasterStart.addEventListener('click', async () => {
+        await engine.start();
+        transportOverlay.classList.add('hidden');
+        globalStatusDot.classList.add('active');
+        globalStatusText.textContent = 'TRANSMITTING';
+        hudEngine.textContent = 'ACTIVE';
+        hudPolyphony.textContent = `${engine.voices.length} VOICES`;
+
+        if (activeSource === 'wikipedia') providers.wiki.start();
+      });
+
+      // Play/Pause
+      btnTogglePlay.addEventListener('click', () => {
+        if (engine.isPlaying) {
+          engine.pause();
+          togglePlayLabel.textContent = 'RIPRENDI';
+          globalStatusDot.classList.remove('active');
+          globalStatusText.textContent = 'PAUSED';
+          hudEngine.textContent = 'PAUSED';
+        } else {
+          engine.start();
+          togglePlayLabel.textContent = 'PAUSA';
+          globalStatusDot.classList.add('active');
+          globalStatusText.textContent = 'TRANSMITTING';
+          hudEngine.textContent = 'ACTIVE';
+        }
+      });
+
+      // Volume Slider
+      sliderVolume.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        engine.setVolume(val);
+        volumeVal.textContent = `${Math.round(val * 100)}%`;
+      });
+
+      // Sensitivity / Dynamic Expressiveness Slider
+      const sliderSensitivity = document.getElementById('slider-sensitivity');
+      const sensitivityVal = document.getElementById('sensitivity-val');
+      sliderSensitivity.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        engine.setSensitivity(val);
+        sensitivityVal.textContent = `${val.toFixed(1)}x`;
+      });
+
+      // Mood / Scale Selector
+      selectMood.addEventListener('change', (e) => {
+        engine.setScale(e.target.value);
+        hudScale.textContent = SCALES[e.target.value].name.toUpperCase();
+      });
+
+      // Kit strumentale
+      const selectKit = document.getElementById('select-kit');
+      const hudKit = document.getElementById('hud-kit');
+      selectKit.addEventListener('change', (e) => {
+        engine.setKit(e.target.value);
+        hudKit.textContent = KITS[e.target.value].name.toUpperCase();
+      });
+
+      // Fullscreen
+      btnFullscreen.addEventListener('click', () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+        else document.exitFullscreen().catch(()=>{});
+      });
+
+      // Refresh Loop (200ms)
+      setInterval(() => {
+        let metrics = null;
+        switch(activeSource) {
+          case 'device':
+            metrics = providers.device.update(engine);
+            break;
+          case 'wikipedia':
+            metrics = providers.wiki.update();
+            break;
+          case 'lorenz':
+            metrics = providers.lorenz.update();
+            break;
+          case 'iss':
+            metrics = providers.iss.update();
+            break;
+          case 'earthquake':
+            metrics = providers.quake.update();
+            break;
+          case 'gameoflife':
+            metrics = providers.life.update();
+            break;
+          case 'atmosphere':
+            metrics = providers.atmo.update();
+            break;
+        }
+
+        if (metrics) {
+          c1Title.textContent = metrics.c1.title;
+          c1Val.textContent = metrics.c1.val;
+          c1Unit.textContent = metrics.c1.unit;
+          c1Badge.textContent = metrics.c1.badge;
+          c1Meter.style.width = `${metrics.c1.meter}%`;
+          c1Map.textContent = metrics.c1.map;
+
+          c2Title.textContent = metrics.c2.title;
+          c2Val.textContent = metrics.c2.val;
+          c2Unit.textContent = metrics.c2.unit;
+          c2Badge.textContent = metrics.c2.badge;
+          c2Meter.style.width = `${metrics.c2.meter}%`;
+          c2Map.textContent = metrics.c2.map;
+
+          c3Title.textContent = metrics.c3.title;
+          c3Val.textContent = metrics.c3.val;
+          c3Unit.textContent = metrics.c3.unit;
+          c3Badge.textContent = metrics.c3.badge;
+          c3Meter.style.width = `${metrics.c3.meter}%`;
+          c3Map.textContent = metrics.c3.map;
+
+          c4Title.textContent = metrics.c4.title;
+          c4Val.textContent = metrics.c4.val;
+          c4Unit.textContent = metrics.c4.unit;
+          c4Badge.textContent = metrics.c4.badge;
+          c4Meter.style.width = `${metrics.c4.meter}%`;
+          c4Map.textContent = metrics.c4.map;
+
+          tickerText.textContent = metrics.ticker;
+        }
+      }, 200);
+
+      // Start Render Loop
+      renderer.draw(providers);
+    });
+  </script>
+</body>
+</html>
