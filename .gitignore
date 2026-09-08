@@ -1,1 +1,7 @@
 .cache/
+
+.vercel
+
+# Pix Agent
+.pi/
+.pi-lens/

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cabasa — Multi-Source Generative Soundtrack</title>
-  <meta name="description" content="Strumento di musica generativa sperimentale e ambient: trasforma hardware, Wikipedia, terremoti terrestri, meteo, automi cellulari e orbita ISS in musica dal vivo.">
+  <meta name="description" content="Experimental ambient generative music tool: transforms hardware, Wikipedia, earthquakes, weather, cellular automata, and ISS orbit into live music.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23070910'/%3E%3Cg fill='none' stroke='%2300f0ff' stroke-linecap='round'%3E%3Cpath d='M16 22.5v6.5' stroke-width='3.2'/%3E%3Ccircle cx='16' cy='13' r='9.0' stroke-width='3.4' stroke-dasharray='0.01 3.5343'/%3E%3Ccircle cx='16' cy='13' r='4.6' stroke-width='2.2'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -620,7 +620,7 @@
 
     <!-- UNIVERSE SOURCE TABS -->
     <div class="source-tabs-wrapper">
-      <div class="source-tabs-label">Seleziona Universo di Dati Live (Data Provider):</div>
+      <div class="source-tabs-label">Select Live Data Universe (Data Provider):</div>
       <div class="source-tabs" role="tablist">
         <button class="source-tab active" data-source="device">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
@@ -666,7 +666,7 @@
       </div>
 
       <div class="ticker-bar" id="ticker-bar">
-        <span class="ticker-text" id="ticker-text">Pronto. Seleziona una sorgente dati e una scala modale per iniziare.</span>
+        <span class="ticker-text" id="ticker-text">Ready. Select a data source and a modal scale to begin.</span>
       </div>
 
       <!-- Start / Stop Interaction Overlay -->
@@ -678,7 +678,7 @@
           START CABASA
         </button>
         <p class="start-subtext">
-          Cabasa sintetizza musica generativa in tempo reale mappando 7 universi di dati (hardware, Wikipedia live, terremoti planetari, meteo, automi cellulari e orbita spaziale) su 12 scale modali esotiche.
+          Cabasa synthesizes real-time generative music by mapping 7 data universes (hardware, live Wikipedia, planetary earthquakes, weather, cellular automata, and space orbit) onto 12 exotic modal scales.
         </p>
       </div>
     </div>
@@ -688,7 +688,7 @@
       <div class="controls-left">
         <button class="btn-icon" id="btn-toggle-play">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-          <span id="toggle-play-label">PAUSA</span>
+          <span id="toggle-play-label">PAUSE</span>
         </button>
 
         <div class="slider-group">
@@ -735,7 +735,7 @@
       </div>
 
       <div class="controls-right">
-        <button class="btn-icon" id="btn-auto" title="Cambia kit e scala a caso ogni 20 secondi">
+        <button class="btn-icon" id="btn-auto" title="Randomly change kit and scale every 20 seconds">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg>
           <span id="auto-label">AUTO OFF</span>
         </button>
@@ -809,7 +809,7 @@
     <footer>
       <div class="footer-left">
         <span class="concept-pill">100% Serverless Audio Engine</span>
-        <span>7 Provider Dati Live &bull; 12 Scale Modali &bull; 6 Kit Strumentali &bull; Web Audio API &amp; Canvas Hi-DPI.</span>
+        <span>7 Live Data Providers &bull; 12 Modal Scales &bull; 6 Instrument Kits &bull; Web Audio API &amp; Canvas Hi-DPI.</span>
       </div>
       <div class="footer-right">
         <span>Costruito da</span>
