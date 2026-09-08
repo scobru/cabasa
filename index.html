@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cabasa — Multi-Source Generative Soundtrack</title>
   <meta name="description" content="Strumento di musica generativa sperimentale e ambient: trasforma hardware, Wikipedia, terremoti terrestri, meteo, automi cellulari e orbita ISS in musica dal vivo.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23070910'/%3E%3Cg fill='none' stroke='%2300f0ff' stroke-linecap='round'%3E%3Cpath d='M16 22.5v6.5' stroke-width='3.2'/%3E%3Ccircle cx='16' cy='13' r='9.0' stroke-width='3.4' stroke-dasharray='0.01 3.5343'/%3E%3Ccircle cx='16' cy='13' r='4.6' stroke-width='2.2'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -90,8 +91,8 @@
     }
 
     .logo-icon svg {
-      width: 22px;
-      height: 22px;
+      width: 26px;
+      height: 26px;
       stroke: var(--cyan-neon);
     }
 
@@ -549,6 +550,39 @@
       gap: 0.8rem;
     }
 
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    footer a:hover {
+      color: var(--cyan-neon);
+      border-color: var(--cyan-neon);
+    }
+
+    footer a svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .footer-sep {
+      opacity: 0.35;
+    }
+
     .concept-pill {
       background: rgba(0, 240, 255, 0.05);
       border: 1px solid rgba(0, 240, 255, 0.15);
@@ -564,8 +598,10 @@
     <header>
       <div class="brand">
         <div class="logo-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Cabasa">
+            <path d="M12 17v4.5" stroke-width="2.3"></path>
+            <circle cx="12" cy="9.5" r="7.0" stroke-width="2.4" stroke-dasharray="0.01 2.7489"></circle>
+            <circle cx="12" cy="9.5" r="3.6" stroke-width="1.7"></circle>
           </svg>
         </div>
         <div class="brand-text">
@@ -773,10 +809,19 @@
     <footer>
       <div class="footer-left">
         <span class="concept-pill">100% Serverless Audio Engine</span>
-        <span>7 Provider Dati Live &bull; 12 Scale Modali &bull; Web Audio API & Canvas Hi-DPI.</span>
+        <span>7 Provider Dati Live &bull; 12 Scale Modali &bull; 6 Kit Strumentali &bull; Web Audio API &amp; Canvas Hi-DPI.</span>
       </div>
       <div class="footer-right">
-        <span>Cabasa &mdash; Infinite Algorithmic Soundtrack</span>
+        <span>Costruito da</span>
+        <a href="https://github.com/scobru" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          scobru
+        </a>
+        <span class="footer-sep">&bull;</span>
+        <a href="https://github.com/scobru/cabasa" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          scobru/cabasa
+        </a>
       </div>
     </footer>
   </div>
