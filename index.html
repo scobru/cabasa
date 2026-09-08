@@ -759,7 +759,7 @@
           <span class="metric-unit" id="c1-unit">Voci</span>
         </div>
         <div class="meter-bar"><div class="meter-fill" id="c1-meter" style="width: 50%;"></div></div>
-        <div class="card-sound-map"><span id="c1-map">Oscillatori stereo spazializzati L/R</span></div>
+        <div class="card-sound-map"><span id="c1-map">Stereo oscillators L/R</span></div>
       </div>
 
       <!-- Card 2 -->
@@ -773,7 +773,7 @@
           <span class="metric-unit" id="c2-unit">ms delay</span>
         </div>
         <div class="meter-bar"><div class="meter-fill" id="c2-meter" style="width: 20%;"></div></div>
-        <div class="card-sound-map"><span id="c2-map">Filtro Cutoff & Risonanza Moog</span></div>
+        <div class="card-sound-map"><span id="c2-map">Filter Cutoff & Moog Resonance</span></div>
       </div>
 
       <!-- Card 3 -->
@@ -787,7 +787,7 @@
           <span class="metric-unit" id="c3-unit">MB Heap</span>
         </div>
         <div class="meter-bar"><div class="meter-fill" id="c3-meter" style="width: 35%;"></div></div>
-        <div class="card-sound-map"><span id="c3-map">Decay Riverbero & Chimes</span></div>
+        <div class="card-sound-map"><span id="c3-map">Decay Reverb & Chimes</span></div>
       </div>
 
       <!-- Card 4 -->
@@ -1425,10 +1425,10 @@
         }
 
         return {
-          c1: { title: 'CPU CORES', val: this.cores, unit: 'Voci', badge: `${this.cores} LOGICAL`, meter: Math.min(100, (this.cores / 32) * 100), map: 'Oscillatori & note polifoniche' },
-          c2: { title: 'EVENT LOOP JITTER', val: this.jitterMs.toFixed(1), unit: 'ms', badge: this.jitterMs > 8 ? 'STRESS' : 'NOMINAL', meter: Math.min(100, this.jitterMs * 4), map: 'Brillantezza del filtro' },
+          c1: { title: 'CPU CORES', val: this.cores, unit: 'Voices', badge: `${this.cores} LOGICAL`, meter: Math.min(100, (this.cores / 32) * 100), map: 'Oscillators & polyphonic notes' },
+          c2: { title: 'EVENT LOOP JITTER', val: this.jitterMs.toFixed(1), unit: 'ms', badge: this.jitterMs > 8 ? 'STRESS' : 'NOMINAL', meter: Math.min(100, this.jitterMs * 4), map: 'Filter brightness' },
           c3: { title: 'RAM / JS HEAP', val: this.heapMB === null ? 'N/D' : this.heapMB, unit: this.heapMB === null ? '' : 'MB', badge: this.heapMB === null ? 'API ASSENTE' : 'LIVE HEAP', meter: this.heapMB === null ? 0 : Math.min(100, (this.heapMB / 200) * 100), map: 'Grado dell\'accordo tenuto' },
-          c4: { title: 'ALIMENTAZIONE', val: this.battery === null ? 'N/D' : Math.round(this.battery * 100), unit: this.battery === null ? '' : '%', badge: this.battery === null ? 'API ASSENTE' : (this.charging ? 'CHARGING' : 'BATTERY'), meter: this.battery === null ? 0 : Math.round(this.battery * 100), map: 'Tremolo: profondità e velocità' },
+          c4: { title: 'Power Supply', val: this.battery === null ? 'N/D' : Math.round(this.battery * 100), unit: this.battery === null ? '' : '%', badge: this.battery === null ? 'API ASSENTE' : (this.charging ? 'CHARGING' : 'BATTERY'), meter: this.battery === null ? 0 : Math.round(this.battery * 100), map: 'Tremolo: depth & speed' },
           ticker: `Hardware: ${this.cores} core attivi | Jitter: ${this.jitterMs.toFixed(1)}ms | RAM Heap: ${this.heapMB === null ? 'non esposto dal browser' : this.heapMB + 'MB'} | Batteria: ${this.battery === null ? 'API non disponibile' : Math.round(this.battery * 100) + '%'}`
         };
       }
@@ -1527,10 +1527,10 @@
         }
 
         return {
-          c1: { title: 'WIKIPEDIA EDITS', val: this.editsCount, unit: 'modifiche', badge: 'STREAM LIVE', meter: Math.min(100, (this.editsCount % 100)), map: 'Note armoniche generate' },
-          c2: { title: 'HUMAN RATIO', val: humanPct, unit: '%', badge: `${this.humanEdits} HUM / ${this.botEdits} BOT`, meter: humanPct, map: 'Campane per umani, glitch per bot' },
-          c3: { title: 'FLUSSO KNOWLEDGE', val: eps.toFixed(1), unit: 'ev/sec', badge: 'ACTIVE SSE', meter: Math.min(100, eps * 2.5), map: 'Brillantezza del filtro' },
-          c4: { title: 'WIKI RAGGIUNTE', val: this.wikis.size, unit: 'progetti', badge: this.active ? 'SSE CONNESSO' : 'NON CONNESSO', meter: Math.min(100, this.wikis.size * 2), map: 'Spazializzazione stereo' },
+          c1: { title: 'WIKIPEDIA EDITS', val: this.editsCount, unit: 'edits', badge: 'STREAM LIVE', meter: Math.min(100, (this.editsCount % 100)), map: 'Harmonic notes generated' },
+          c2: { title: 'HUMAN RATIO', val: humanPct, unit: '%', badge: `${this.humanEdits} HUM / ${this.botEdits} BOT`, meter: humanPct, map: 'Bells for humans, glitch for bots' },
+          c3: { title: 'FLUSSO KNOWLEDGE', val: eps.toFixed(1), unit: 'ev/sec', badge: 'ACTIVE SSE', meter: Math.min(100, eps * 2.5), map: 'Filter brightness' },
+          c4: { title: 'WIKI RAGGIUNTE', val: this.wikis.size, unit: 'projects', badge: this.active ? 'SSE CONNESSO' : 'NON CONNESSO', meter: Math.min(100, this.wikis.size * 2), map: 'Stereo spatialization' },
           ticker: `Wikipedia Live: "${this.lastTitle}"`
         };
       }
@@ -1594,10 +1594,10 @@
         }
 
         return {
-          c1: { title: 'LORENZ COORDINATA X', val: this.x.toFixed(1), unit: 'pos', badge: 'CHAOS ORBIT', meter: Math.min(100, Math.abs(this.x) * 3.5), map: 'Brillantezza del filtro' },
-          c2: { title: 'LORENZ COORDINATA Y', val: this.y.toFixed(1), unit: 'vel', badge: 'ATTRACTOR', meter: Math.min(100, Math.abs(this.y) * 3.5), map: 'Transizioni tra ali della farfalla' },
-          c3: { title: 'LORENZ COORDINATA Z', val: this.z.toFixed(1), unit: 'alt', badge: 'NON-LINEAR', meter: Math.min(100, (this.z / 50) * 100), map: 'Accordo del drone e delay feedback' },
-          c4: { title: 'VELOCITÀ TRAIETTORIA', val: speed.toFixed(1), unit: 'u/step', badge: 'INTEGRAZIONE RK', meter: Math.min(100, speed * 4), map: 'Zero ripetizione melodica' },
+          c1: { title: 'LORENZ COORDINATA X', val: this.x.toFixed(1), unit: 'pos', badge: 'CHAOS ORBIT', meter: Math.min(100, Math.abs(this.x) * 3.5), map: 'Filter brightness' },
+          c2: { title: 'LORENZ COORDINATA Y', val: this.y.toFixed(1), unit: 'vel', badge: 'ATTRACTOR', meter: Math.min(100, Math.abs(this.y) * 3.5), map: 'Butterfly wing transitions' },
+          c3: { title: 'LORENZ COORDINATA Z', val: this.z.toFixed(1), unit: 'alt', badge: 'NON-LINEAR', meter: Math.min(100, (this.z / 50) * 100), map: 'Drone chord & delay feedback' },
+          c4: { title: 'VELOCITÀ TRAIETTORIA', val: speed.toFixed(1), unit: 'u/step', badge: 'INTEGRAZIONE RK', meter: Math.min(100, speed * 4), map: 'Zero melodic repetition' },
           ticker: `Attrattore Caotico di Lorenz: X=${this.x.toFixed(2)} | Y=${this.y.toFixed(2)} | Z=${this.z.toFixed(2)} // Traiettoria infinita deterministica`
         };
       }
@@ -1676,19 +1676,19 @@
         if (!this.live) {
           const off = { badge: 'NO SIGNAL', meter: 0, unit: '' };
           return {
-            c1: { title: 'ISS LATITUDINE', val: '--', ...off, map: 'Accordo del drone (fascia polare)' },
-            c2: { title: 'ISS LONGITUDINE', val: '--', ...off, map: 'Inclinazione Spazio Stereo' },
-            c3: { title: 'QUOTA ORBITALE', val: '--', ...off, map: 'Coda del riverbero' },
-            c4: { title: 'LUCE SOLARE', val: '--', ...off, map: 'In attesa della telemetria' },
+            c1: { title: 'ISS LATITUDINE', val: '--', ...off, map: 'Drone chord (polar band)' },
+            c2: { title: 'ISS LONGITUDINE', val: '--', ...off, map: 'Stereo space inclination' },
+            c3: { title: 'QUOTA ORBITALE', val: '--', ...off, map: 'Reverb tail' },
+            c4: { title: 'LUCE SOLARE', val: '--', ...off, map: 'Waiting for telemetry' },
             ticker: `ISS: nessun dato dall'API wheretheiss.at (${this.lastError}). Nessun valore simulato.`
           };
         }
 
         const isDay = this.visibility === 'daylight';
         return {
-          c1: { title: 'ISS LATITUDINE', val: this.lat.toFixed(2), unit: '°', badge: 'ORBITAL', meter: Math.min(100, Math.abs(this.lat) * 1.9), map: 'Accordo del drone (fascia polare)' },
-          c2: { title: 'ISS LONGITUDINE', val: this.lon.toFixed(2), unit: '°', badge: 'COORDINATES', meter: Math.min(100, ((this.lon + 180) / 360) * 100), map: 'Inclinazione Spazio Stereo' },
-          c3: { title: 'QUOTA ORBITALE', val: this.altitude, unit: 'km', badge: 'THERMOSPHERE', meter: Math.min(100, ((this.altitude - 380) / 60) * 100), map: 'Coda del riverbero' },
+          c1: { title: 'ISS LATITUDINE', val: this.lat.toFixed(2), unit: '°', badge: 'ORBITAL', meter: Math.min(100, Math.abs(this.lat) * 1.9), map: 'Drone chord (polar band)' },
+          c2: { title: 'ISS LONGITUDINE', val: this.lon.toFixed(2), unit: '°', badge: 'COORDINATES', meter: Math.min(100, ((this.lon + 180) / 360) * 100), map: 'Stereo space inclination' },
+          c3: { title: 'QUOTA ORBITALE', val: this.altitude, unit: 'km', badge: 'THERMOSPHERE', meter: Math.min(100, ((this.altitude - 380) / 60) * 100), map: 'Reverb tail' },
           c4: { title: 'LUCE SOLARE', val: isDay ? 'DAY' : 'ECLIPSE', unit: 'phase', badge: isDay ? 'SUNLIGHT' : 'EARTH SHADOW', meter: isDay ? 100 : 20, map: isDay ? 'Campane Celestiali' : 'Drone Siderale' },
           ticker: `ISS Space Station: Lat ${this.lat.toFixed(2)}°, Lon ${this.lon.toFixed(2)}° | Quota: ${this.altitude} km | Velocità: ${this.velocity} km/h | ${isDay ? 'Luce Solare Diretta' : 'Ombra Terrestre'}`
         };
@@ -1777,10 +1777,10 @@
         }
 
         return {
-          c1: { title: 'TERREMOTI RECENTI', val: this.count, unit: 'scosse/ora', badge: `MAX M${this.maxMag.toFixed(1)}`, meter: Math.min(100, this.count * 4), map: 'Brillantezza e accordo del drone' },
-          c2: { title: 'MAGNITUDO SCAN', val: this.lastEvent ? this.lastEvent.mag.toFixed(1) : '--', unit: 'Richter', badge: 'SEISMIC', meter: this.lastEvent ? Math.min(100, (this.lastEvent.mag / 7) * 100) : 30, map: 'Risonanza e profondità gong' },
-          c3: { title: 'EPICENTRO STEREO', val: this.lastEvent ? `${this.lastEvent.lon.toFixed(0)}°` : '--', unit: 'lon', badge: this.lastEvent ? 'GEOPHYSICAL' : 'IN ATTESA', meter: this.lastEvent ? Math.abs(this.lastEvent.lon) / 1.8 : 0, map: 'Posizionamento stereo Panner' },
-          c4: { title: 'SCANSIONE CATALOGO', val: this.catalog.length ? `${this.scanIdx + 1}/${this.catalog.length}` : '--', unit: 'evento', badge: this.catalog.length ? 'USGS ALL_HOUR' : 'FEED VUOTO', meter: this.catalog.length ? ((this.scanIdx + 1) / this.catalog.length) * 100 : 0, map: 'Rimbombo a bassa frequenza' },
+          c1: { title: 'Recent Earthquakes', val: this.count, unit: 'quakes/h', badge: `MAX M${this.maxMag.toFixed(1)}`, meter: Math.min(100, this.count * 4), map: 'Brightness & drone chord' },
+          c2: { title: 'Magnitude Scan', val: this.lastEvent ? this.lastEvent.mag.toFixed(1) : '--', unit: 'Richter', badge: 'SEISMIC', meter: this.lastEvent ? Math.min(100, (this.lastEvent.mag / 7) * 100) : 30, map: 'Resonance & gong depth' },
+          c3: { title: 'Stereo Epicenter', val: this.lastEvent ? `${this.lastEvent.lon.toFixed(0)}°` : '--', unit: 'lon', badge: this.lastEvent ? 'GEOPHYSICAL' : 'IN ATTESA', meter: this.lastEvent ? Math.abs(this.lastEvent.lon) / 1.8 : 0, map: 'Stereo panner position' },
+          c4: { title: 'Catalog Scan', val: this.catalog.length ? `${this.scanIdx + 1}/${this.catalog.length}` : '--', unit: 'event', badge: this.catalog.length ? 'USGS ALL_HOUR' : 'FEED VUOTO', meter: this.catalog.length ? ((this.scanIdx + 1) / this.catalog.length) * 100 : 0, map: 'Low-frequency rumble' },
           ticker: `Sismologia Planetaria USGS: [Rilevamento] ${this.activePlace}`
         };
       }
@@ -1882,10 +1882,10 @@
         }
 
         return {
-          c1: { title: 'CELLULE VIVE', val: this.liveCount, unit: 'organismi', badge: 'LIFE ACTIVE', meter: livePct * 2, map: 'Trigger arpeggi poliritmici' },
-          c2: { title: 'GENERAZIONE', val: this.generation, unit: 'ciclo', badge: 'AUTOMATA', meter: (this.generation % 100), map: 'Evoluzione genetica continua' },
-          c3: { title: 'DENSITÀ MATRICE', val: livePct, unit: '%', badge: `${this.cols}x${this.rows} GRID`, meter: livePct, map: 'Accordo del drone e brillantezza' },
-          c4: { title: 'NASCITE / GEN', val: this.births, unit: 'celle', badge: 'REGOLA B3/S23', meter: Math.min(100, this.births * 4), map: 'Spazializzazione X/Y' },
+          c1: { title: 'Living Cells', val: this.liveCount, unit: 'organisms', badge: 'LIFE ACTIVE', meter: livePct * 2, map: 'Polyrhythmic arpeggio trigger' },
+          c2: { title: 'Generation', val: this.generation, unit: 'cycle', badge: 'AUTOMATA', meter: (this.generation % 100), map: 'Continuous genetic evolution' },
+          c3: { title: 'Matrix Density', val: livePct, unit: '%', badge: `${this.cols}x${this.rows} GRID`, meter: livePct, map: 'Drone chord & brightness' },
+          c4: { title: 'Births / Gen', val: this.births, unit: 'cells', badge: 'REGOLA B3/S23', meter: Math.min(100, this.births * 4), map: 'Spazializzazione X/Y' },
           ticker: `Game of Life: Generazione ${this.generation} | ${this.liveCount} cellule attive in divisione genetica`
         };
       }
@@ -1964,19 +1964,19 @@
         if (!this.live) {
           const off = { badge: 'IN ATTESA', meter: 0, unit: '' };
           return {
-            c1: { title: 'VELOCITÀ DEL VENTO', val: '--', ...off, map: 'Brillantezza e tremolo' },
-            c2: { title: 'PRESSIONE BAROMETRICA', val: '--', ...off, map: 'Profondità del riverbero' },
-            c3: { title: 'CAMPANE EOLICHE', val: this.chimes, ...off, map: 'Note cristalline nel vento' },
-            c4: { title: 'TEMPERATURA ARIA', val: '--', ...off, map: 'Accordo del drone' },
+            c1: { title: 'Wind Speed', val: '--', ...off, map: 'Brightness & tremolo' },
+            c2: { title: 'Barometric Pressure', val: '--', ...off, map: 'Reverb depth' },
+            c3: { title: 'Wind Chimes', val: this.chimes, ...off, map: 'Crystalline notes in wind' },
+            c4: { title: 'Air Temperature', val: '--', ...off, map: 'Drone chord' },
             ticker: 'Meteo: nessun dato da Open-Meteo. Nessun valore simulato.'
           };
         }
 
         return {
-          c1: { title: 'VENTO / RAFFICA', val: `${this.windSpeed.toFixed(1)}→${this.gustSpeed.toFixed(0)}`, unit: 'km/h', badge: 'OPEN-METEO 10M', meter: Math.min(100, this.gustSpeed * 2), map: 'Brillantezza e tremolo' },
-          c2: { title: 'PRESSIONE BAROMETRICA', val: this.pressure.toFixed(0), unit: 'hPa', badge: 'ISOBARIC', meter: Math.min(100, (this.pressure - 970) * 1.5), map: 'Profondità del riverbero' },
-          c3: { title: 'CAMPANE EOLICHE', val: this.chimes, unit: 'note', badge: 'WIND HARMONICS', meter: Math.min(100, this.chimes % 100), map: 'Note cristalline nel vento' },
-          c4: { title: 'TEMPERATURA ARIA', val: this.temp.toFixed(1), unit: '°C', badge: 'ROMA 41.9N 12.5E', meter: Math.min(100, (this.temp + 10) * 2), map: 'Accordo del drone' },
+          c1: { title: 'Wind / Gusts', val: `${this.windSpeed.toFixed(1)}→${this.gustSpeed.toFixed(0)}`, unit: 'km/h', badge: 'OPEN-METEO 10M', meter: Math.min(100, this.gustSpeed * 2), map: 'Brightness & tremolo' },
+          c2: { title: 'Barometric Pressure', val: this.pressure.toFixed(0), unit: 'hPa', badge: 'ISOBARIC', meter: Math.min(100, (this.pressure - 970) * 1.5), map: 'Reverb depth' },
+          c3: { title: 'Wind Chimes', val: this.chimes, unit: 'note', badge: 'WIND HARMONICS', meter: Math.min(100, this.chimes % 100), map: 'Crystalline notes in wind' },
+          c4: { title: 'Air Temperature', val: this.temp.toFixed(1), unit: '°C', badge: 'ROMA 41.9N 12.5E', meter: Math.min(100, (this.temp + 10) * 2), map: 'Drone chord' },
           ticker: `Meteo & Atmosfera (Roma): Vento ${this.windSpeed.toFixed(1)} km/h, raffiche ${this.gustSpeed.toFixed(0)} km/h | Pressione ${this.pressure.toFixed(0)} hPa | Temperatura ${this.temp}°C`
         };
       }
