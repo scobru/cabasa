@@ -948,6 +948,22 @@
       }
     };
 
+    // Scala di tensione armonica, ordinata da consonanza aperta a cluster teso.
+    // I provider non scelgono piu' un accordo da un ternario: passano uno scalare
+    // 0..1 e setHarmony interpola *in frequenza* fra due gradini adiacenti, cosi'
+    // anche un dato che si muove di un centesimo muove il drone.
+    const HARMONY_LADDER = [
+      [0, 4, 7, 11], // maggiore aperto
+      [0, 4, 7, 9],
+      [0, 2, 7, 9],  // sospeso
+      [0, 2, 5, 9],
+      [0, 3, 7, 10], // minore settima
+      [0, 3, 7, 11],
+      [0, 1, 5, 8],
+      [0, 1, 4, 7],
+      [0, 1, 6, 8]   // cluster
+    ];
+
     class CabasaAudioEngine {
       constructor() {
         this.ctx = null;
@@ -971,6 +987,11 @@
         this.tremGain = null;
         this.activeOneShots = 0;
         this.chord = [0, 2, 4, 7];
+        // Stato dell'armonia continua: null finche' qualcuno chiama setHarmony.
+        this.harmonyTension = null;
+        this.harmonyState = null;
+        // Trasposizione continua dell'intero drone (rapporto di frequenza).
+        this.droneShift = 1;
       }
 
       setSensitivity(val) {
@@ -1085,7 +1106,7 @@
           const osc = this.ctx.createOscillator();
           osc.type = this.activeKit.drone[i % this.activeKit.drone.length];
 
-          const freq = this.chordFreq(i);
+          const freq = this.voiceFreq(i);
           osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
 
           const lfo = this.ctx.createOscillator();
@@ -1117,13 +1138,7 @@
       setScale(scaleKey) {
         if (!SCALES[scaleKey]) return;
         this.activeScale = SCALES[scaleKey];
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        this.voices.forEach((v, i) => {
-          const freq = this.chordFreq(i);
-          v.baseFreq = freq;
-          v.osc.frequency.setTargetAtTime(freq, now, 0.4);
-        });
+        this.applyVoiceFreqs(0.4);
       }
 
       // Cambia il corpo del suono a caldo: forme d'onda del drone, vibrato, risonanza.
@@ -1183,7 +1198,59 @@
 
       chordFreq(i) {
         const oct = Math.pow(2, Math.floor(i / this.chord.length));
-        return this.degreeFreq(this.chord[i % this.chord.length], oct);
+        return this.degreeFreq(this.chord[i % this.chord.length], oct) * this.droneShift;
+      }
+
+      // Frequenza effettiva di una voce del drone: se e' attiva l'armonia continua
+      // interpola fra i due gradini della scala di tensione, altrimenti usa
+      // l'accordo a gradi interi impostato da setChord.
+      voiceFreq(i) {
+        const st = this.harmonyState;
+        if (!st) return this.chordFreq(i);
+        const oct = Math.pow(2, Math.floor(i / st.lo.length));
+        const fLo = this.degreeFreq(st.lo[i % st.lo.length], oct);
+        const fHi = this.degreeFreq(st.hi[i % st.hi.length], oct);
+        // Interpolazione logaritmica: il passaggio attraversa i quarti di tono
+        // invece di scattare, ed e' quello che rende udibile la deriva del dato.
+        return fLo * Math.pow(fHi / fLo, st.frac) * this.droneShift;
+      }
+
+      applyVoiceFreqs(glide = 0.5) {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        this.voices.forEach((v, i) => {
+          const f = this.voiceFreq(i);
+          v.baseFreq = f;
+          v.osc.frequency.setTargetAtTime(f, now, glide);
+        });
+      }
+
+      // tension in 0..1. Sostituisce i ternari di accordi sparsi nei provider:
+      // ogni valore intermedio produce un'armonia diversa, non uno di tre stati.
+      setHarmony(tension, glide = 0.6) {
+        const t = Math.min(1, Math.max(0, Number.isFinite(tension) ? tension : 0));
+        // La sensibilita' espande il contrasto attorno al centro anche qui, non
+        // solo sul filtro: a 2.5x le stesse escursioni di dato spostano piu' armonia.
+        const shaped = Math.min(1, Math.max(0, 0.5 + (t - 0.5) * this.sensitivity));
+        this.harmonyTension = t;
+        const pos = shaped * (HARMONY_LADDER.length - 1);
+        const i = Math.min(HARMONY_LADDER.length - 2, Math.floor(pos));
+        const lo = HARMONY_LADDER[i];
+        const hi = HARMONY_LADDER[i + 1];
+        this.harmonyState = { lo, hi, frac: pos - i };
+        // chord resta il gradino piu' vicino: chi lo legge (device, HUD) trova
+        // sempre gradi interi validi.
+        this.chord = ((pos - i) < 0.5 ? lo : hi).slice();
+        this.applyVoiceFreqs(glide);
+      }
+
+      // Trasposizione continua del drone. Un dato che scorre (la latitudine ISS,
+      // la pressione) puo' cosi' far scivolare tutta l'armonia, non solo colorarla.
+      setDroneShift(ratio, glide = 0.8) {
+        const r = Math.min(2, Math.max(0.5, Number.isFinite(ratio) ? ratio : 1));
+        if (Math.abs(r - this.droneShift) < 0.0008) return;
+        this.droneShift = r;
+        this.applyVoiceFreqs(glide);
       }
 
       // n in 0..1. Mappa esponenziale: lo sweep si sente lineare all'orecchio.
@@ -1191,8 +1258,11 @@
       // moltiplicare dentro il clamp (dove ogni valore suonava identico).
       setBrightness(n, glide = 0.15) {
         if (!this.ctx || !this.filter) return;
-        const shaped = Math.min(1, Math.max(0, 0.5 + (n - 0.5) * this.sensitivity));
-        const f = 300 * Math.pow(7000 / 300, shaped);
+        // Il clamp duro schiacciava sullo stesso cutoff tutto cio' che stava sopra
+        // ~0.83 (a sensibilita' 1.5): meta' della corsa del dato era inudibile.
+        // tanh comprime senza mai appiattire, quindi l'ordine dei valori sopravvive.
+        const shaped = 0.5 + 0.5 * Math.tanh((n - 0.5) * this.sensitivity * 1.7);
+        const f = 300 * Math.pow(7000 / 300, Math.min(1, Math.max(0, shaped)));
         this.filter.frequency.setTargetAtTime(f, this.ctx.currentTime, glide);
       }
 
@@ -1200,15 +1270,13 @@
       // non solo il timbro. No-op se l'accordo e' identico (evita glide continui).
       setChord(degrees, glide = 0.5) {
         if (!degrees || !degrees.length) return;
-        if (degrees.length === this.chord.length && degrees.every((d, i) => d === this.chord[i])) return;
+        const same = !this.harmonyState && degrees.length === this.chord.length
+          && degrees.every((d, i) => d === this.chord[i]);
+        if (same) return;
         this.chord = degrees.slice();
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        this.voices.forEach((v, i) => {
-          const f = this.chordFreq(i);
-          v.baseFreq = f;
-          v.osc.frequency.setTargetAtTime(f, now, glide);
-        });
+        this.harmonyState = null;
+        this.harmonyTension = null;
+        this.applyVoiceFreqs(glide);
       }
 
       setTremolo(rate, depth) {
@@ -1224,6 +1292,10 @@
       resetModulation() {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
+        // La trasposizione del drone e' di chi l'ha impostata: cambiando universo
+        // va riportata a zero, altrimenti l'ISS lasciava tutto calato di una quinta.
+        this.droneShift = 1;
+        this.applyVoiceFreqs(0.5);
         this.filter.Q.setTargetAtTime(this.activeKit.q, now, 0.2);
         this.reverbGain.gain.setTargetAtTime(0.35, now, 0.3);
         this.delayFeedback.gain.setTargetAtTime(0.3, now, 0.3);
@@ -1369,6 +1441,15 @@
         this.battery = null;
         this.charging = null;
         this.lastTime = performance.now();
+        // performance.memory e' solo Chromium e la Battery API non c'e' quasi piu':
+        // su Firefox e Safari il provider restava piatto. Questi due segnali sono
+        // reali e misurabili ovunque, e cambiano di continuo.
+        this.frameMs = 16.7;      // durata media del frame, da requestAnimationFrame
+        this.frameJitter = 0;     // sua deviazione: e' il carico che si sente
+        this.lastFrame = null;
+        this.link = navigator.connection || null;
+        this.deviceMemory = navigator.deviceMemory || null;
+        this.measureFrames();
 
         if ('getBattery' in navigator) {
           navigator.getBattery().then(b => {
@@ -1378,6 +1459,35 @@
             b.addEventListener('chargingchange', () => { this.charging = b.charging; });
           }).catch(()=>{});
         }
+      }
+
+      // Cadenza reale del compositor: risente di carico, throttling termico e
+      // di quanto lavora il visualizer. E' il polso della macchina, non un timer.
+      measureFrames() {
+        const tick = (t) => {
+          if (this.lastFrame !== null) {
+            const dt = t - this.lastFrame;
+            if (dt > 0 && dt < 500) {
+              this.frameJitter = (this.frameJitter * 0.9) + (Math.abs(dt - this.frameMs) * 0.1);
+              this.frameMs = (this.frameMs * 0.9) + (dt * 0.1);
+            }
+          }
+          this.lastFrame = t;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+
+      // Indice di carico 0..1 composto solo dai segnali che questo browser espone
+      // davvero. Quelli assenti non entrano nella media: nessun valore di ripiego.
+      loadIndex() {
+        const parts = [];
+        parts.push(Math.min(1, this.jitterMs / 25));
+        parts.push(Math.min(1, this.frameJitter / 9));
+        if (this.heapMB !== null) parts.push(Math.min(1, this.heapMB / 160));
+        if (this.link && Number.isFinite(this.link.rtt)) parts.push(Math.min(1, this.link.rtt / 400));
+        if (this.battery !== null && !this.charging) parts.push(1 - this.battery);
+        return parts.reduce((a, b) => a + b, 0) / parts.length;
       }
 
       update(engine) {
@@ -1400,15 +1510,23 @@
 
         if (engine && engine.isPlaying) {
           const sens = engine.sensitivity || 1.5;
-          // Jitter -> brillantezza. Base 0.3 + heap: a macchina scarica il jitter e' ~0,
-          // da solo lasciava il filtro parcheggiato sul fondo e il drone spariva.
+          const load = this.loadIndex();
+          // Jitter del loop + jitter del frame -> brillantezza. Il secondo si muove
+          // anche dove le API di memoria e batteria non esistono.
           const heapNorm = this.heapMB === null ? 0 : Math.min(1, this.heapMB / 120);
-          engine.setBrightness(0.3 + Math.min(0.5, this.jitterMs / 20) + heapNorm * 0.2, 0.12);
+          engine.setBrightness(
+            0.28 + Math.min(0.4, this.jitterMs / 22) + Math.min(0.2, this.frameJitter / 12) + heapNorm * 0.15,
+            0.12
+          );
 
-          // Heap -> grado dell'accordo. Senza performance.memory ripiego sui core,
-          // che sono comunque un dato reale, invece di inventare un heap.
-          const step = Math.round((this.heapMB === null ? this.cores * 3 : this.heapMB) / 22);
-          engine.setChord([step, step + 2, step + 4, step + 6]);
+          // Carico complessivo -> tensione armonica continua. Prima l'heap veniva
+          // diviso in gradini da 22MB e senza performance.memory il grado era
+          // this.cores * 3, cioe' una costante: l'accordo non cambiava mai.
+          engine.setHarmony(load, 0.7);
+          // Frequenza di frame -> registro: quando la macchina scende sotto i 60fps
+          // tutto il drone cala, ed e' un calo che si sente prima di vederlo.
+          const fps = 1000 / Math.max(1, this.frameMs);
+          engine.setDroneShift(Math.pow(2, -Math.min(0.5, Math.max(0, (60 - fps) / 60)) * 0.5), 1.0);
 
           // Batteria -> tremolo. Senza Battery API niente tremolo: meglio muto che finto.
           if (this.battery === null) engine.setTremolo(0.1, 0);
@@ -1427,9 +1545,9 @@
         return {
           c1: { title: 'CPU CORES', val: this.cores, unit: 'Voices', badge: `${this.cores} LOGICAL`, meter: Math.min(100, (this.cores / 32) * 100), map: 'Oscillators & polyphonic notes' },
           c2: { title: 'EVENT LOOP JITTER', val: this.jitterMs.toFixed(1), unit: 'ms', badge: this.jitterMs > 8 ? 'STRESS' : 'NOMINAL', meter: Math.min(100, this.jitterMs * 4), map: 'Filter brightness' },
-          c3: { title: 'RAM / JS HEAP', val: this.heapMB === null ? 'N/D' : this.heapMB, unit: this.heapMB === null ? '' : 'MB', badge: this.heapMB === null ? 'API ASSENTE' : 'LIVE HEAP', meter: this.heapMB === null ? 0 : Math.min(100, (this.heapMB / 200) * 100), map: 'Grado dell\'accordo tenuto' },
-          c4: { title: 'Power Supply', val: this.battery === null ? 'N/D' : Math.round(this.battery * 100), unit: this.battery === null ? '' : '%', badge: this.battery === null ? 'API ASSENTE' : (this.charging ? 'CHARGING' : 'BATTERY'), meter: this.battery === null ? 0 : Math.round(this.battery * 100), map: 'Tremolo: depth & speed' },
-          ticker: `Hardware: ${this.cores} core attivi | Jitter: ${this.jitterMs.toFixed(1)}ms | RAM Heap: ${this.heapMB === null ? 'non esposto dal browser' : this.heapMB + 'MB'} | Batteria: ${this.battery === null ? 'API non disponibile' : Math.round(this.battery * 100) + '%'}`
+          c3: { title: 'FRAME CADENCE', val: (1000 / Math.max(1, this.frameMs)).toFixed(1), unit: 'fps', badge: `±${this.frameJitter.toFixed(1)}ms`, meter: Math.min(100, (1000 / Math.max(1, this.frameMs) / 120) * 100), map: 'Drone register & brightness' },
+          c4: { title: 'SYSTEM LOAD', val: Math.round(this.loadIndex() * 100), unit: '%', badge: this.heapMB !== null ? `HEAP ${this.heapMB}MB` : (this.deviceMemory ? `${this.deviceMemory}GB RAM` : 'HEAP API ABSENT'), meter: this.loadIndex() * 100, map: 'Harmonic tension (continuous)' },
+          ticker: `Hardware: ${this.cores} cores | Loop jitter ${this.jitterMs.toFixed(1)}ms | Frame ${(1000 / Math.max(1, this.frameMs)).toFixed(1)}fps ±${this.frameJitter.toFixed(1)}ms | Heap ${this.heapMB === null ? 'not exposed by browser' : this.heapMB + 'MB'} | Battery ${this.battery === null ? 'API unavailable' : Math.round(this.battery * 100) + '%'}${this.link && Number.isFinite(this.link.rtt) ? ` | Net RTT ${this.link.rtt}ms` : ''}`
         };
       }
     }
@@ -1520,9 +1638,10 @@
         if (this.engine && this.engine.isPlaying) {
           // Traffico globale -> brillantezza: la wiki che si sveglia apre il filtro
           this.engine.setBrightness(0.3 + Math.min(0.7, eps / 40), 0.4);
-          // Rapporto umani/bot -> colore armonico (maggiore / minore / cluster dissonante)
+          // Rapporto umani/bot -> tensione armonica continua: piu' bot, piu' cluster.
+          // Con tre accordi fissi il colore restava identico per minuti interi.
           const h = humanPct / 100;
-          this.engine.setChord(h > 0.6 ? [0, 4, 7, 11] : h > 0.35 ? [0, 3, 7, 10] : [0, 1, 5, 8], 0.9);
+          this.engine.setHarmony(1 - h, 0.9);
           this.engine.reverbGain.gain.setTargetAtTime(0.25 + h * 0.4, this.engine.ctx.currentTime, 0.5);
         }
 
@@ -1575,10 +1694,9 @@
           // Clamp a 0.55: oltre, con il ping-pong, l'anello si autoalimenta
           this.engine.delayFeedback.gain.setTargetAtTime(0.2 + (normZ * 0.35), now, 0.1);
 
-          // Fasce di quota Z -> accordi diversi. Il caos diventa movimento armonico,
-          // non solo un cutoff che oscilla: la differenza si sente anche a occhi chiusi.
-          const band = Math.min(3, Math.floor(normZ * 4));
-          this.engine.setChord([[0, 3, 7, 10], [0, 2, 5, 9], [0, 4, 7, 11], [0, 1, 6, 8]][band], 0.6);
+          // Quota Z -> armonia continua. A fasce, l'accordo scattava quattro volte
+          // per orbita; interpolato, l'attrattore modula l'armonia senza sosta.
+          this.engine.setHarmony(normZ, 0.35);
 
           // Rileva salto tra le ali della farfalla (Lobe Transition) per note ritmiche caotiche
           const curSign = Math.sign(this.x);
@@ -1603,7 +1721,32 @@
       }
     }
 
+    // Elevazione solare a una coordinata, algoritmo a bassa precisione NOAA
+    // (errore < 0.02 gradi). Serve a sostituire il salto binario giorno/eclissi
+    // con l'attraversamento continuo del terminatore.
+    function solarElevation(lat, lon, date) {
+      const rad = Math.PI / 180;
+      const n = (date.getTime() / 86400000) + 2440587.5 - 2451545.0;
+      const meanLon = (280.460 + 0.9856474 * n) % 360;
+      const meanAnom = ((357.528 + 0.9856003 * n) % 360) * rad;
+      const ecLon = (meanLon + 1.915 * Math.sin(meanAnom) + 0.020 * Math.sin(2 * meanAnom)) * rad;
+      const obliq = (23.439 - 0.0000004 * n) * rad;
+      const decl = Math.asin(Math.sin(obliq) * Math.sin(ecLon));
+      const ra = Math.atan2(Math.cos(obliq) * Math.sin(ecLon), Math.cos(ecLon));
+      const gmst = (18.697374558 + 24.06570982441908 * n) % 24;
+      const hourAngle = ((gmst * 15 + lon) * rad) - ra;
+      const el = Math.asin(
+        Math.sin(lat * rad) * Math.sin(decl) +
+        Math.cos(lat * rad) * Math.cos(decl) * Math.cos(hourAngle)
+      );
+      return el / rad;
+    }
+
     // PROVIDER 4: ISS Orbit Live
+    // Il poll e' ogni 5s e la latitudine si muove di frazioni di grado: mappata su
+    // tre bucket di accordo, l'ISS restava ferma per mezza orbita. Ora la posizione
+    // viene propagata a ogni tick (200ms) lungo la rotta reale e ogni grandezza
+    // orbitale muove un parametro in continuo.
     class IssOrbit {
       constructor(engine) {
         this.engine = engine;
@@ -1614,9 +1757,16 @@
         this.velocity = null;
         this.visibility = null;
         this.live = false;
-        this.lastError = 'connessione in corso';
+        this.lastError = 'connecting';
         this.lastFetch = 0;
-        this.lastPulse = 0;
+        // Dead reckoning fra un fix e l'altro
+        this.fix = null;        // ultimo fix ricevuto dall'API
+        this.prevFix = null;    // fix precedente, serve per la rotta
+        this.bearing = null;    // rotta in radianti, derivata da due fix reali
+        this.angRate = 0;       // velocita' angolare in rad/s, dalla velocita' misurata
+        this.sunElev = null;
+        this.lastNoteLat = null;
+        this.orbitTrace = [];
         this.fetchISS();
       }
 
@@ -1625,49 +1775,124 @@
           const res = await fetch('https://api.wheretheiss.at/v1/satellites/25544');
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
-          this.lat = data.latitude;
-          this.lon = data.longitude;
+          const fix = {
+            lat: data.latitude,
+            lon: data.longitude,
+            alt: data.altitude,
+            vel: data.velocity,
+            t: performance.now()
+          };
+          this.prevFix = this.fix;
+          this.fix = fix;
           this.altitude = Math.round(data.altitude);
           this.velocity = Math.round(data.velocity);
           this.visibility = data.visibility;
+
+          // Rotta reale fra due fix consecutivi: niente direzione presunta.
+          if (this.prevFix) {
+            this.bearing = this.bearingBetween(this.prevFix.lat, this.prevFix.lon, fix.lat, fix.lon);
+          }
+          // Velocita' angolare dal dato di velocita', non dal delta rumoroso dei fix
+          this.angRate = (data.velocity / 3600) / (6371 + data.altitude);
+          this.lat = fix.lat;
+          this.lon = fix.lon;
           this.live = true;
           this.lastError = '';
         } catch (e) {
           // Nessuna orbita simulata: il catch inventava lat/lon con un seno e le
           // mostrava come telemetria reale. Se l'API tace, lo diciamo.
           this.live = false;
-          this.lastError = e.message || 'rete non raggiungibile';
+          this.lastError = e.message || 'network unreachable';
         }
+      }
+
+      bearingBetween(lat1, lon1, lat2, lon2) {
+        const rad = Math.PI / 180;
+        const p1 = lat1 * rad, p2 = lat2 * rad, dl = (lon2 - lon1) * rad;
+        const y = Math.sin(dl) * Math.cos(p2);
+        const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+        return Math.atan2(y, x);
+      }
+
+      // Propaga il fix lungo l'ortodromia: fra un poll e l'altro la stazione
+      // continua a muoversi, quindi anche il suono continua a muoversi.
+      propagate(now) {
+        if (!this.fix) return;
+        if (this.bearing === null || !this.angRate) {
+          this.lat = this.fix.lat;
+          this.lon = this.fix.lon;
+          return;
+        }
+        const rad = Math.PI / 180;
+        const d = this.angRate * ((now - this.fix.t) / 1000);
+        const p1 = this.fix.lat * rad, l1 = this.fix.lon * rad;
+        const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(this.bearing));
+        const l2 = l1 + Math.atan2(
+          Math.sin(this.bearing) * Math.sin(d) * Math.cos(p1),
+          Math.cos(d) - Math.sin(p1) * Math.sin(p2)
+        );
+        this.lat = p2 / rad;
+        this.lon = (((l2 / rad) + 540) % 360) - 180;
       }
 
       update() {
         const now = performance.now();
-        if (now - this.lastFetch > 4000) {
+        if (now - this.lastFetch > 5000) {
           this.fetchISS();
           this.lastFetch = now;
+        }
+        if (this.live) {
+          this.propagate(now);
+          this.orbitTrace.push({ lat: this.lat, lon: this.lon });
+          if (this.orbitTrace.length > 260) this.orbitTrace.shift();
+          // Elevazione del Sole sul punto sub-satellite. A 420 km l'alba orbitale
+          // scatta a circa -20 gradi (depressione dell'orizzonte): il passaggio
+          // dura ~30 secondi reali ed e' ora una rampa, non un interruttore.
+          this.sunElev = solarElevation(this.lat, this.lon, new Date());
         }
 
         if (this.live && this.engine && this.engine.isPlaying) {
           const audioNow = this.engine.ctx.currentTime;
           const sens = this.engine.sensitivity || 1.5;
-          const isDay = this.visibility === 'daylight';
-
-          // Sole vs ombra terrestre: salto di brillantezza netto, si sente all'istante
-          this.engine.setBrightness(isDay ? 0.9 : 0.08, 0.6);
-          this.engine.reverbGain.gain.setTargetAtTime(isDay ? 0.3 : 0.75, audioNow, 0.6);
-
-          // Latitudine -> accordo: ai poli armonia tesa, all'equatore aperta
           const absLat = Math.abs(this.lat);
-          this.engine.setChord(absLat > 40 ? [0, 1, 5, 8] : absLat > 18 ? [0, 3, 7, 10] : [0, 4, 7, 9], 0.9);
 
-          // Impulso telemetrico orbitale
-          const pulseInterval = Math.max(200, 700 / sens);
-          if (!this.lastPulse || (now - this.lastPulse > pulseInterval)) {
-            this.lastPulse = now;
+          // Terminatore continuo: 0 in piena ombra, 1 in piena luce, con la rampa
+          // centrata sulla depressione dell'orizzonte orbitale.
+          const dayness = Math.min(1, Math.max(0, (this.sunElev + 26) / 12));
+          // dayness satura appena passato il terminatore: da sola inchiodava il
+          // filtro per meta' orbita. L'altezza del Sole sopra l'orizzonte continua
+          // a salire e scendere per tutti i ~46 minuti di luce, e ora si sente.
+          const noon = Math.min(1, Math.max(0, this.sunElev / 90));
+          this.engine.setBrightness(0.06 + dayness * 0.66 + noon * 0.24, 0.45);
+          this.engine.reverbGain.gain.setTargetAtTime(0.72 - dayness * 0.34 - noon * 0.12, audioNow, 0.6);
+
+          // Latitudine -> tensione armonica continua. L'inclinazione dell'orbita e'
+          // 51.6 gradi: normalizzo su quella, cosi' l'intera corsa e' sfruttata.
+          this.engine.setHarmony(Math.min(1, absLat / 51.6), 0.9);
+          // ...e trasposizione continua del drone: salendo verso nord tutta
+          // l'armonia scivola in alto, di circa una quinta da polo a polo.
+          this.engine.setDroneShift(Math.pow(2, (this.lat / 90) * (7 / 12)), 1.0);
+
+          // Quota (408-423 km) -> larghezza del battimento fra le voci
+          if (this.altitude) {
+            const altNorm = Math.min(1, Math.max(0, (this.altitude - 405) / 25));
+            this.engine.voices.forEach((v, idx) => {
+              const detune = ((idx % 2) ? 1 : -1) * altNorm * 12 * sens;
+              v.osc.detune.setTargetAtTime(detune, audioNow, 0.6);
+            });
+          }
+
+          // Il ritmo viene dall'orbita, non da un timer: una nota ogni N gradi di
+          // latitudine percorsi. All'equatore la latitudine corre e le note si
+          // infittiscono, ai vertici dell'orbita rallentano fino a diradarsi.
+          const stepDeg = Math.max(0.35, 1.4 / sens);
+          if (this.lastNoteLat === null) this.lastNoteLat = this.lat;
+          if (Math.abs(this.lat - this.lastNoteLat) >= stepDeg) {
+            this.lastNoteLat = this.lat;
             const pan = Math.max(-1, Math.min(1, this.lon / 180));
             this.engine.triggerNote(
-              this.engine.degreeFreq(Math.floor(absLat / 12), isDay ? 4 : 2),
-              pan, isDay ? 0.9 : 2.0, isDay ? 'bell' : 'pluck'
+              this.engine.degreeFreq(Math.floor((absLat / 51.6) * 7), dayness > 0.5 ? 4 : 2),
+              pan, 0.7 + (1 - dayness) * 1.6, dayness > 0.5 ? 'bell' : 'pluck'
             );
           }
         }
@@ -1676,26 +1901,31 @@
         if (!this.live) {
           const off = { badge: 'NO SIGNAL', meter: 0, unit: '' };
           return {
-            c1: { title: 'ISS LATITUDINE', val: '--', ...off, map: 'Drone chord (polar band)' },
-            c2: { title: 'ISS LONGITUDINE', val: '--', ...off, map: 'Stereo space inclination' },
-            c3: { title: 'QUOTA ORBITALE', val: '--', ...off, map: 'Reverb tail' },
-            c4: { title: 'LUCE SOLARE', val: '--', ...off, map: 'Waiting for telemetry' },
-            ticker: `ISS: nessun dato dall'API wheretheiss.at (${this.lastError}). Nessun valore simulato.`
+            c1: { title: 'ISS LATITUDE', val: '--', ...off, map: 'Harmonic tension & drone register' },
+            c2: { title: 'ISS LONGITUDE', val: '--', ...off, map: 'Stereo space inclination' },
+            c3: { title: 'ORBITAL ALTITUDE', val: '--', ...off, map: 'Voice detune spread' },
+            c4: { title: 'SOLAR ELEVATION', val: '--', ...off, map: 'Waiting for telemetry' },
+            ticker: `ISS: no data from the wheretheiss.at API (${this.lastError}). No simulated values.`
           };
         }
 
-        const isDay = this.visibility === 'daylight';
+        const dayness = Math.min(1, Math.max(0, (this.sunElev + 26) / 12));
+        const phase = dayness > 0.85 ? 'SUNLIGHT' : dayness < 0.15 ? 'EARTH SHADOW' : 'TERMINATOR';
         return {
-          c1: { title: 'ISS LATITUDINE', val: this.lat.toFixed(2), unit: '°', badge: 'ORBITAL', meter: Math.min(100, Math.abs(this.lat) * 1.9), map: 'Drone chord (polar band)' },
-          c2: { title: 'ISS LONGITUDINE', val: this.lon.toFixed(2), unit: '°', badge: 'COORDINATES', meter: Math.min(100, ((this.lon + 180) / 360) * 100), map: 'Stereo space inclination' },
-          c3: { title: 'QUOTA ORBITALE', val: this.altitude, unit: 'km', badge: 'THERMOSPHERE', meter: Math.min(100, ((this.altitude - 380) / 60) * 100), map: 'Reverb tail' },
-          c4: { title: 'LUCE SOLARE', val: isDay ? 'DAY' : 'ECLIPSE', unit: 'phase', badge: isDay ? 'SUNLIGHT' : 'EARTH SHADOW', meter: isDay ? 100 : 20, map: isDay ? 'Campane Celestiali' : 'Drone Siderale' },
-          ticker: `ISS Space Station: Lat ${this.lat.toFixed(2)}°, Lon ${this.lon.toFixed(2)}° | Quota: ${this.altitude} km | Velocità: ${this.velocity} km/h | ${isDay ? 'Luce Solare Diretta' : 'Ombra Terrestre'}`
+          c1: { title: 'ISS LATITUDE', val: this.lat.toFixed(3), unit: '°', badge: this.lat >= 0 ? 'NORTHBOUND ARC' : 'SOUTHBOUND ARC', meter: Math.min(100, (Math.abs(this.lat) / 51.6) * 100), map: 'Harmonic tension & drone register' },
+          c2: { title: 'ISS LONGITUDE', val: this.lon.toFixed(3), unit: '°', badge: this.bearing === null ? 'AWAITING 2ND FIX' : 'DEAD RECKONED', meter: ((this.lon + 180) / 360) * 100, map: 'Stereo space inclination' },
+          c3: { title: 'ORBITAL ALTITUDE', val: this.altitude, unit: 'km', badge: 'THERMOSPHERE', meter: Math.min(100, Math.max(0, ((this.altitude - 405) / 25) * 100)), map: 'Voice detune spread' },
+          c4: { title: 'SOLAR ELEVATION', val: this.sunElev.toFixed(1), unit: '°', badge: phase, meter: dayness * 100, map: 'Brightness & reverb (continuous sweep)' },
+          ticker: `ISS Space Station: Lat ${this.lat.toFixed(3)}°, Lon ${this.lon.toFixed(3)}° | Altitude ${this.altitude} km | Speed ${this.velocity} km/h | Sun ${this.sunElev.toFixed(1)}° — ${phase}`
         };
       }
     }
 
     // PROVIDER 5: Earth Seismic Activity (USGS Live)
+    // Il catalogo veniva scorso in tondo a intervallo fisso: il ritmo che si sentiva
+    // era il timer, non la sismicita'. Ora ogni scossa suona alla sua posizione
+    // temporale reale (properties.time), con l'ora compressa in un ciclo di ascolto:
+    // gli sciami restano sciami, le ore quiete restano quiete.
     class EarthquakeFeed {
       constructor(engine) {
         this.engine = engine;
@@ -1703,85 +1933,193 @@
         this.count = 0;
         this.maxMag = 0;
         this.lastFetch = 0;
-        this.lastScan = 0;
-        this.scanIdx = 0;
         this.catalog = [];
         this.recentEvents = [];
-        this.activePlace = 'Scansione sismica globale in corso...';
+        this.activePlace = 'Global seismic scan in progress...';
+        // Riproduzione a tempo reale compresso
+        this.knownIds = new Set();
+        this.playedIds = new Set();
+        this.liveQueue = [];
+        this.replayIdx = 0;
+        this.replayStart = 0;
+        this.windowStart = 0;
+        this.windowEnd = 0;
+        this.cycle = 0;
+        this.virtualTime = null;
+        // Energia rilasciata nella finestra gia' scorsa: sale con lo sciame, decade nel silenzio
+        this.energy = 0;
+        this.meanDepth = 20;
+        this.lastUpdate = 0;
         this.fetchQuakes();
       }
 
       async fetchQuakes() {
         try {
           const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson');
-          if (res.ok) {
-            const data = await res.json();
-            // Scarto gli eventi senza magnitudo invece di assegnargliene una finta (era 1.5)
-            this.catalog = data.features
-              .filter(f => typeof f.properties.mag === 'number' && f.geometry && f.geometry.coordinates)
-              .map(f => ({
-                id: f.id,
-                mag: f.properties.mag,
-                place: f.properties.place || 'localit\u00e0 non riportata',
-                lon: f.geometry.coordinates[0],
-                lat: f.geometry.coordinates[1],
-                time: performance.now()
-              }));
-            this.count = this.catalog.length;
-            if (this.count > 0) this.maxMag = Math.max(...this.catalog.map(q => q.mag));
+          if (!res.ok) return;
+          const data = await res.json();
+          // Scarto gli eventi senza magnitudo invece di assegnargliene una finta (era 1.5)
+          const list = data.features
+            .filter(f => typeof f.properties.mag === 'number' && f.geometry && f.geometry.coordinates
+              && typeof f.properties.time === 'number')
+            .map(f => ({
+              id: f.id,
+              mag: f.properties.mag,
+              place: f.properties.place || 'location not reported',
+              lon: f.geometry.coordinates[0],
+              lat: f.geometry.coordinates[1],
+              depth: f.geometry.coordinates[2] ?? 10,
+              epoch: f.properties.time
+            }))
+            .sort((a, b) => a.epoch - b.epoch);
+
+          if (!list.length) return;
+
+          const firstLoad = this.knownIds.size === 0;
+          // Una scossa mai vista in un fetch successivo e' accaduta davvero adesso:
+          // suona subito, senza aspettare il proprio turno nella riproduzione.
+          if (!firstLoad) {
+            list.forEach(q => { if (!this.knownIds.has(q.id)) this.liveQueue.push(q); });
           }
+          list.forEach(q => this.knownIds.add(q.id));
+
+          this.catalog = list;
+          this.count = list.length;
+          this.maxMag = Math.max(...list.map(q => q.mag));
+          this.windowStart = list[0].epoch;
+          this.windowEnd = list[list.length - 1].epoch;
+          // Al primo carico non si avvia l'orologio: partirebbe col fetch, e chi
+          // seleziona l'universo dopo un minuto si troverebbe l'arretrato addosso.
+          // Parte al primo update, cioe' quando qualcuno sta davvero ascoltando.
+          if (firstLoad) { this.replayIdx = 0; this.playedIds.clear(); }
+          else this.replayIdx = this.resyncIndex();
         } catch (e) {}
+      }
+
+      restartReplay() {
+        this.replayStart = performance.now();
+        this.replayIdx = 0;
+        this.playedIds.clear();
+        this.cycle++;
+      }
+
+      // Riaggancio dopo un refetch. La lista cambia sotto i piedi (arrivano scosse
+      // nuove, quelle vecchie escono dalla finestra oraria), quindi l'indice va
+      // ricalcolato sull'identita' degli eventi: ancorandolo al tempo virtuale,
+      // le scosse che il cap per tick non aveva ancora suonato sparivano.
+      resyncIndex() {
+        let i = 0;
+        while (i < this.catalog.length && this.playedIds.has(this.catalog[i].id)) i++;
+        return i;
+      }
+
+      // Durata di un giro completo della finestra oraria, in ms di ascolto.
+      replaySpan(sens) {
+        return Math.max(25000, 90000 / sens);
+      }
+
+      fire(q, now, live) {
+        this.lastEvent = q;
+        this.playedIds.add(q.id);
+        // Il timestamp e' quello dello scoccare, non del fetch: altrimenti l'onda
+        // d'urto nasceva gia' scaduta e il visualizer non disegnava nulla.
+        this.recentEvents.push({ ...q, time: now, live });
+        this.activePlace = `${q.place} (M${q.mag.toFixed(1)})`;
+        // Energia di Gutenberg-Richter normalizzata: una M5 pesa ~1000 volte una M3,
+        // quindi il drone si apre per le scosse forti e non per il conteggio grezzo.
+        this.energy = Math.min(1, this.energy + Math.pow(10, 1.5 * (q.mag - 4)) * 0.05);
+        this.meanDepth = (this.meanDepth * 0.85) + (Math.max(0, q.depth) * 0.15);
+
+        if (!this.engine || !this.engine.isPlaying) return;
+        const sens = this.engine.sensitivity || 1.5;
+        const pan = Math.max(-1, Math.min(1, q.lon / 180));
+        const basePitch = this.engine.activeScale.base * (q.mag > 3.0 ? 0.75 : 1.5);
+        this.engine.triggerSubGong(basePitch, 1.8 + (q.mag * 0.7 * sens), pan);
+        // Ogni scossa ha una voce, non solo quelle sopra M4.5: la magnitudo sceglie
+        // registro e durata. Un evento arrivato live squilla piu' acuto e piu' lungo.
+        const big = q.mag >= 4.0;
+        this.engine.triggerNote(
+          this.engine.degreeFreq(Math.round(q.mag * 1.5) % 7, big ? 2 : 4),
+          -pan, big ? 2.8 : 0.9, big || live ? 'bell' : 'pluck'
+        );
       }
 
       update() {
         const now = performance.now();
-        if (this.recentEvents) this.recentEvents = this.recentEvents.filter(ev => (now - ev.time) < 6000);
+        // update() gira solo mentre l'universo e' selezionato. Rientrando dopo una
+        // pausa il tempo virtuale sarebbe corso avanti da solo e all'ascolto si
+        // sarebbe rovesciato addosso l'arretrato: si riparte dall'inizio dell'ora.
+        if (!this.replayStart || (this.lastUpdate && now - this.lastUpdate > 1500)) this.restartReplay();
+        this.lastUpdate = now;
+        this.recentEvents = this.recentEvents.filter(ev => (now - ev.time) < 6000);
         if (now - this.lastFetch > 20000) {
           this.fetchQuakes();
           this.lastFetch = now;
         }
 
         const sens = this.engine ? (this.engine.sensitivity || 1.5) : 1.5;
-        const scanInterval = Math.max(1200, 3200 / sens);
+
+        // 1. Coda live: le scosse comparse fra un fetch e l'altro, una per tick
+        if (this.liveQueue.length) this.fire(this.liveQueue.shift(), now, true);
+
+        // 2. Riproduzione dell'ora reale a tempo compresso
+        if (this.catalog.length) {
+          const span = Math.max(1, this.windowEnd - this.windowStart);
+          const listen = this.replaySpan(sens);
+          const scale = listen / span; // ms di ascolto per ms reale
+          const elapsed = now - this.replayStart;
+          this.virtualTime = this.windowStart + (elapsed / scale);
+          // Si guarda fino al tick successivo, non solo al presente: gli eventi
+          // che cadono dentro i 200ms del loop vanno distribuiti, non ammucchiati.
+          const horizon = now + 220;
+          let scheduled = 0;
+          while (this.replayIdx < this.catalog.length && scheduled < 6) {
+            const q = this.catalog[this.replayIdx];
+            const dueAt = this.replayStart + (q.epoch - this.windowStart) * scale;
+            if (dueAt > horizon) break;
+            this.replayIdx++;
+            scheduled++;
+            const wait = dueAt - now;
+            // Sotto la risoluzione del loop uno sciame denso collassava in un
+            // accordo simultaneo: il ritardo residuo gli ridà la sua micro-ritmica.
+            if (wait > 6) setTimeout(() => this.fire(q, performance.now(), false), wait);
+            else this.fire(q, now, false);
+          }
+          if (this.replayIdx >= this.catalog.length && elapsed > listen) this.restartReplay();
+        }
+
+        // L'energia decade: dopo uno sciame il pianeta torna cupo da solo
+        this.energy = Math.max(0, this.energy - 0.0022);
 
         if (this.engine && this.engine.isPlaying) {
-          // Sismicita' oraria -> brillantezza; pianeta calmo = drone cupo
-          this.engine.setBrightness(0.3 + Math.min(0.6, this.count / 45), 0.6);
-          // Magnitudo massima dell'ora -> tensione armonica
-          this.engine.setChord(this.maxMag >= 5 ? [0, 1, 4, 7] : this.maxMag >= 3.5 ? [0, 2, 5, 9] : [0, 3, 7, 10], 1.2);
+          const audioNow = this.engine.ctx.currentTime;
+          // Brillantezza: energia sismica accumulata, non il conteggio a gradini
+          this.engine.setBrightness(0.22 + this.energy * 0.68, 0.5);
+          // Tensione armonica continua fra la sismicita' di fondo e il picco dell'ora
+          // count e maxMag cambiano solo al refetch (20s): da soli tenevano
+          // l'armonia immobile fra un poll e l'altro. L'energia accumulata la fa
+          // respirare a ogni scossa e rientrare da sola nel silenzio.
+          const bg = Math.min(1, this.count / 90);
+          const peak = Math.min(1, Math.max(0, (this.maxMag - 1.5) / 4.5));
+          this.engine.setHarmony((bg * 0.3) + (peak * 0.45) + (this.energy * 0.25), 1.1);
+          // Profondita' ipocentrale -> registro del drone: le scosse profonde
+          // (fino a 700 km) trascinano l'armonia verso il basso, in continuo.
+          const deep = Math.min(1, this.meanDepth / 300);
+          this.engine.setDroneShift(Math.pow(2, -deep * 0.5), 1.2);
+          this.engine.reverbGain.gain.setTargetAtTime(0.2 + deep * 0.5, audioNow, 0.8);
         }
 
-        // Ciclo continuo sui terremoti reali del pianeta per variazioni ritmiche audibili
-        if (this.catalog.length > 0 && (!this.lastScan || (now - this.lastScan > scanInterval))) {
-          this.lastScan = now;
-          this.scanIdx = (this.scanIdx + 1) % this.catalog.length;
-          const q = this.catalog[this.scanIdx];
-          this.lastEvent = q;
-          // Il timestamp di q risale al fetch: riusandolo, l'onda d'urto nasceva
-          // gia' scaduta e il visualizer non disegnava mai nulla.
-          this.recentEvents.push({ ...q, time: now });
-          this.activePlace = `${q.place} (M${q.mag.toFixed(1)})`;
-
-          if (this.engine && this.engine.isPlaying) {
-            const pan = Math.max(-1, Math.min(1, q.lon / 180));
-            const basePitch = this.engine.activeScale.base * (q.mag > 3.0 ? 0.75 : 1.5);
-            this.engine.triggerSubGong(basePitch, 1.8 + (q.mag * 0.7 * sens), pan);
-            // Ogni scossa ha una voce, non solo quelle sopra M4.5: la magnitudo
-            // sceglie registro e durata, cosi' la forza del sisma si sente.
-            const big = q.mag >= 4.0;
-            this.engine.triggerNote(
-              this.engine.degreeFreq(Math.round(q.mag * 1.5) % 7, big ? 2 : 4),
-              -pan, big ? 2.8 : 0.9, big ? 'bell' : 'pluck'
-            );
-          }
-        }
+        const posPct = this.catalog.length ? (this.replayIdx / this.catalog.length) * 100 : 0;
+        const clock = this.virtualTime
+          ? new Date(this.virtualTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+          : '--:--';
 
         return {
-          c1: { title: 'Recent Earthquakes', val: this.count, unit: 'quakes/h', badge: `MAX M${this.maxMag.toFixed(1)}`, meter: Math.min(100, this.count * 4), map: 'Brightness & drone chord' },
-          c2: { title: 'Magnitude Scan', val: this.lastEvent ? this.lastEvent.mag.toFixed(1) : '--', unit: 'Richter', badge: 'SEISMIC', meter: this.lastEvent ? Math.min(100, (this.lastEvent.mag / 7) * 100) : 30, map: 'Resonance & gong depth' },
-          c3: { title: 'Stereo Epicenter', val: this.lastEvent ? `${this.lastEvent.lon.toFixed(0)}°` : '--', unit: 'lon', badge: this.lastEvent ? 'GEOPHYSICAL' : 'IN ATTESA', meter: this.lastEvent ? Math.abs(this.lastEvent.lon) / 1.8 : 0, map: 'Stereo panner position' },
-          c4: { title: 'Catalog Scan', val: this.catalog.length ? `${this.scanIdx + 1}/${this.catalog.length}` : '--', unit: 'event', badge: this.catalog.length ? 'USGS ALL_HOUR' : 'FEED VUOTO', meter: this.catalog.length ? ((this.scanIdx + 1) / this.catalog.length) * 100 : 0, map: 'Low-frequency rumble' },
-          ticker: `Sismologia Planetaria USGS: [Rilevamento] ${this.activePlace}`
+          c1: { title: 'Recent Earthquakes', val: this.count, unit: 'quakes/h', badge: `MAX M${this.maxMag.toFixed(1)}`, meter: Math.min(100, this.count * 4), map: 'Harmonic tension (continuous)' },
+          c2: { title: 'Seismic Energy', val: (this.energy * 100).toFixed(0), unit: '%', badge: this.energy > 0.5 ? 'SWARM' : 'BACKGROUND', meter: this.energy * 100, map: 'Filter brightness' },
+          c3: { title: 'Hypocenter Depth', val: this.meanDepth.toFixed(0), unit: 'km', badge: this.meanDepth > 70 ? 'DEEP FOCUS' : 'SHALLOW', meter: Math.min(100, (this.meanDepth / 300) * 100), map: 'Drone register & reverb tail' },
+          c4: { title: 'Replay Clock', val: clock, unit: 'UTC+0', badge: this.catalog.length ? `${this.replayIdx}/${this.catalog.length} EVENTS` : 'EMPTY FEED', meter: posPct, map: 'Real seismic timing, compressed' },
+          ticker: `USGS Planetary Seismology: [${this.liveQueue.length ? 'LIVE' : 'REPLAY ' + clock}] ${this.activePlace} // last hour replayed in ${Math.round(this.replaySpan(sens) / 1000)}s, real intervals preserved`
         };
       }
     }
@@ -1878,7 +2216,7 @@
           // Densita' della colonia -> brillantezza e accordo: la crescita e il collasso
           // della popolazione si sentono come apertura/chiusura e cambio di armonia.
           this.engine.setBrightness(0.2 + Math.min(0.8, dens * 2.6), 0.25);
-          this.engine.setChord(dens > 0.28 ? [0, 2, 4, 6] : dens > 0.15 ? [0, 3, 7, 10] : [0, 7, 11, 14], 0.7);
+          this.engine.setHarmony(Math.min(1, dens * 3), 0.5);
         }
 
         return {
@@ -1892,6 +2230,9 @@
     }
 
     // PROVIDER 7: Atmosphere & Wind (Open-Meteo)
+    // Il movimento udibile veniva da due seni sul tempo: il dato Open-Meteo fissava
+    // solo gli estremi. Ora si percorre la serie oraria realmente misurata delle
+    // ultime 48 ore, interpolata: il respiro del soundscape e' un barografo vero.
     class AtmosphereEngine {
       constructor(engine) {
         this.engine = engine;
@@ -1904,80 +2245,170 @@
         this.chimes = 0;
         this.lastFetch = 0;
         this.lastChime = 0;
+        // Serie oraria misurata + posizione della traversata
+        this.series = [];
+        this.current = null;
+        this.traverseStart = 0;
+        this.sampleTime = null;
+        this.tendency = 0;
         this.fetchAtmosphere();
       }
 
       async fetchAtmosphere() {
         try {
-          // wind_gusts_10m aggiunto: le raffiche ora sono misurate, non sintetizzate
-          const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=41.9&longitude=12.5&current=temperature_2m,surface_pressure,wind_speed_10m,wind_gusts_10m');
-          if (res.ok) {
-            const data = await res.json();
-            if (data.current) {
-              this.temp = data.current.temperature_2m;
-              this.windSpeed = data.current.wind_speed_10m;
-              this.gustSpeed = data.current.wind_gusts_10m ?? data.current.wind_speed_10m;
-              this.pressure = data.current.surface_pressure;
-              this.live = true;
+          // La serie oraria e' il punto: 48 ore di vento, raffiche e pressione
+          // realmente registrate. wind_gusts_10m e' misurato, non sintetizzato.
+          const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=41.9&longitude=12.5'
+            + '&current=temperature_2m,surface_pressure,wind_speed_10m,wind_gusts_10m'
+            + '&hourly=temperature_2m,surface_pressure,wind_speed_10m,wind_gusts_10m'
+            + '&past_days=2&forecast_days=1&timezone=UTC');
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.current) {
+            this.current = {
+              temp: data.current.temperature_2m,
+              wind: data.current.wind_speed_10m,
+              gust: data.current.wind_gusts_10m ?? data.current.wind_speed_10m,
+              press: data.current.surface_pressure
+            };
+          }
+          const h = data.hourly;
+          if (h && h.time && h.time.length) {
+            const nowMs = Date.now();
+            const rows = [];
+            for (let i = 0; i < h.time.length; i++) {
+              const t = Date.parse(h.time[i] + 'Z');
+              // Solo le ore gia' trascorse: la parte di forecast e' previsione,
+              // non misura, e non deve entrare nel soundscape.
+              if (!Number.isFinite(t) || t > nowMs) continue;
+              const wind = h.wind_speed_10m[i];
+              const press = h.surface_pressure[i];
+              const temp = h.temperature_2m[i];
+              if (wind === null || press === null || temp === null) continue;
+              rows.push({ t, wind, press, temp, gust: h.wind_gusts_10m?.[i] ?? wind });
+            }
+            if (rows.length >= 2) {
+              this.series = rows;
+              if (!this.traverseStart) this.traverseStart = performance.now();
             }
           }
+          this.live = !!(this.current || this.series.length);
         } catch (e) { this.live = false; }
+      }
+
+      // Durata di una traversata completa della serie, in ms di ascolto.
+      cycleMs(sens) {
+        return Math.max(90000, 420000 / sens);
+      }
+
+      // Campione interpolato linearmente fra due ore misurate: continuo, e ogni
+      // valore intermedio e' comunque compreso fra due letture reali.
+      sample(now, sens) {
+        const n = this.series.length;
+        if (n < 2) return null;
+        const span = this.series[n - 1].t - this.series[0].t;
+        const pos = ((now - this.traverseStart) % this.cycleMs(sens)) / this.cycleMs(sens);
+        const target = this.series[0].t + pos * span;
+        let i = 0;
+        while (i < n - 2 && this.series[i + 1].t < target) i++;
+        const a = this.series[i], b = this.series[i + 1];
+        const f = b.t === a.t ? 0 : Math.min(1, Math.max(0, (target - a.t) / (b.t - a.t)));
+        const mix = (k) => a[k] + (b[k] - a[k]) * f;
+        return {
+          t: target,
+          wind: mix('wind'),
+          gust: mix('gust'),
+          press: mix('press'),
+          temp: mix('temp'),
+          // Tendenza barometrica reale in hPa/h: il segnale che i marinai leggono
+          // prima del temporale. Positiva = schiarita, negativa = peggioramento.
+          tendency: (b.press - a.press) / Math.max(1, (b.t - a.t) / 3600000)
+        };
       }
 
       update() {
         const now = performance.now();
-        if (now - this.lastFetch > 30000) {
+        // La serie oraria a monte cambia una volta all'ora: pollarla ogni 30s era
+        // solo traffico. Dieci minuti bastano e avanzano.
+        if (!this.lastFetch || now - this.lastFetch > 600000) {
           this.fetchAtmosphere();
           this.lastFetch = now;
         }
 
-        if (this.live && this.engine && this.engine.isPlaying) {
+        const sens = this.engine ? (this.engine.sensitivity || 1.5) : 1.5;
+        const s = this.sample(now, sens);
+        if (s) {
+          this.windSpeed = s.wind;
+          this.gustSpeed = s.gust;
+          this.pressure = s.press;
+          this.temp = s.temp;
+          this.sampleTime = s.t;
+          this.tendency = s.tendency;
+        } else if (this.current) {
+          // Serie non disponibile: si suona l'osservazione corrente, ferma ma vera
+          this.windSpeed = this.current.wind;
+          this.gustSpeed = this.current.gust;
+          this.pressure = this.current.press;
+          this.temp = this.current.temp;
+        }
+
+        if (this.live && this.windSpeed !== null && this.engine && this.engine.isPlaying) {
           const audioNow = this.engine.ctx.currentTime;
-          const sens = this.engine.sensitivity || 1.5;
-          // L'oscillazione corre fra due valori MISURATI, media e raffica di Open-Meteo.
-          // Prima il "gust" era due seni inventati che non guardavano nessun dato.
-          const swell = 0.5 + Math.sin(now * 0.0009) * 0.35 + Math.sin(now * 0.0031) * 0.15;
-          const nowWind = this.windSpeed + (this.gustSpeed - this.windSpeed) * swell;
-          const windNorm = Math.min(1, nowWind / 60);
+          const windNorm = Math.min(1, this.windSpeed / 45);
+          // Raffica su vento medio: turbolenza misurata, non un LFO inventato
+          const gustiness = Math.min(1, Math.max(0, (this.gustSpeed - this.windSpeed) / Math.max(3, this.windSpeed)));
 
-          // Vento -> brillantezza che respira + tremolo: la raffica si sente, non si deduce
-          this.engine.setBrightness(0.2 + Math.min(0.8, windNorm * 1.1), 0.3);
-          this.engine.setTremolo(0.25 + windNorm * 2.5, windNorm * 0.45);
+          // Vento -> brillantezza; turbolenza -> profondita' del tremolo
+          this.engine.setBrightness(0.15 + windNorm * 0.8, 0.35);
+          this.engine.setTremolo(0.2 + windNorm * 2.6, gustiness * 0.4);
 
-          // Bassa pressione -> coda lunga e cupa (temporale in arrivo)
-          const pressNorm = Math.max(0, Math.min(1, (this.pressure - 980) / 50));
-          this.engine.reverbGain.gain.setTargetAtTime(0.15 + ((1 - pressNorm) * 0.55), audioNow, 0.5);
+          // Pressione -> coda del riverbero, in continuo lungo il barografo
+          const pressNorm = Math.min(1, Math.max(0, (this.pressure - 985) / 45));
+          this.engine.reverbGain.gain.setTargetAtTime(0.15 + ((1 - pressNorm) * 0.55), audioNow, 0.7);
 
-          // Temperatura -> accordo: freddo minore/sospeso, caldo maggiore aperto
-          this.engine.setChord(this.temp < 8 ? [0, 3, 7, 10] : this.temp < 22 ? [0, 2, 7, 9] : [0, 4, 7, 11], 1.0);
+          // Temperatura -> tensione armonica continua sull'escursione stagionale
+          this.engine.setHarmony(1 - Math.min(1, Math.max(0, (this.temp + 5) / 40)), 1.2);
+          // Tendenza barometrica -> trasposizione: la pressione che crolla
+          // trascina giu' il drone mentre il fronte si avvicina.
+          this.engine.setDroneShift(Math.pow(2, Math.max(-0.4, Math.min(0.4, this.tendency / 6)) * 0.5), 1.4);
 
-          // Campane eoliche: piu' forte la raffica misurata, piu' fitte le note
-          const chimeInterval = Math.max(220, 2200 / (Math.max(2, nowWind) * sens * 0.6));
+          // Campane eoliche: la densita' segue il vento misurato all'istante suonato
+          const chimeInterval = Math.max(220, 2400 / (Math.max(2, this.gustSpeed) * sens * 0.6));
           if (!this.lastChime || (now - this.lastChime > chimeInterval)) {
             this.lastChime = now;
             this.chimes++;
-            const pan = Math.sin(now * 0.002) * 0.85; // prima usciva da [-1,1] e restava incollato ai bordi
-            this.engine.triggerNote(this.engine.degreeFreq(Math.floor(Math.random() * 7), 4), pan, 1.4, 'bell');
+            // Altezza e posizione da pressione e temperatura, non da Math.random:
+            // due ore diverse della serie suonano due campane diverse.
+            const degree = Math.floor(Math.abs(this.pressure * 10) % 7);
+            const pan = Math.max(-0.85, Math.min(0.85, this.tendency * 0.6));
+            this.engine.triggerNote(this.engine.degreeFreq(degree, this.temp > 18 ? 4 : 2), pan, 1.4, 'bell');
           }
         }
 
-        if (!this.live) {
-          const off = { badge: 'IN ATTESA', meter: 0, unit: '' };
+        if (!this.live || this.windSpeed === null) {
+          const off = { badge: 'WAITING', meter: 0, unit: '' };
           return {
-            c1: { title: 'Wind Speed', val: '--', ...off, map: 'Brightness & tremolo' },
+            c1: { title: 'Wind / Gusts', val: '--', ...off, map: 'Brightness & tremolo' },
             c2: { title: 'Barometric Pressure', val: '--', ...off, map: 'Reverb depth' },
             c3: { title: 'Wind Chimes', val: this.chimes, ...off, map: 'Crystalline notes in wind' },
-            c4: { title: 'Air Temperature', val: '--', ...off, map: 'Drone chord' },
-            ticker: 'Meteo: nessun dato da Open-Meteo. Nessun valore simulato.'
+            c4: { title: 'Air Temperature', val: '--', ...off, map: 'Harmonic tension' },
+            ticker: 'Weather: no data from Open-Meteo. No simulated values.'
           };
         }
 
+        const stamp = this.sampleTime
+          ? new Date(this.sampleTime).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+          : 'now';
+        const hours = this.series.length
+          ? Math.round((this.series[this.series.length - 1].t - this.series[0].t) / 3600000)
+          : 0;
+
         return {
           c1: { title: 'Wind / Gusts', val: `${this.windSpeed.toFixed(1)}→${this.gustSpeed.toFixed(0)}`, unit: 'km/h', badge: 'OPEN-METEO 10M', meter: Math.min(100, this.gustSpeed * 2), map: 'Brightness & tremolo' },
-          c2: { title: 'Barometric Pressure', val: this.pressure.toFixed(0), unit: 'hPa', badge: 'ISOBARIC', meter: Math.min(100, (this.pressure - 970) * 1.5), map: 'Reverb depth' },
-          c3: { title: 'Wind Chimes', val: this.chimes, unit: 'note', badge: 'WIND HARMONICS', meter: Math.min(100, this.chimes % 100), map: 'Crystalline notes in wind' },
-          c4: { title: 'Air Temperature', val: this.temp.toFixed(1), unit: '°C', badge: 'ROMA 41.9N 12.5E', meter: Math.min(100, (this.temp + 10) * 2), map: 'Drone chord' },
-          ticker: `Meteo & Atmosfera (Roma): Vento ${this.windSpeed.toFixed(1)} km/h, raffiche ${this.gustSpeed.toFixed(0)} km/h | Pressione ${this.pressure.toFixed(0)} hPa | Temperatura ${this.temp}°C`
+          c2: { title: 'Barometric Pressure', val: this.pressure.toFixed(1), unit: 'hPa', badge: `${this.tendency >= 0 ? '+' : ''}${this.tendency.toFixed(2)} hPa/h`, meter: Math.min(100, Math.max(0, (this.pressure - 970) * 1.5)), map: 'Reverb depth & drone register' },
+          c3: { title: 'Traverse Clock', val: stamp, unit: 'UTC', badge: hours ? `${hours}H MEASURED` : 'CURRENT ONLY', meter: this.series.length ? ((this.sampleTime - this.series[0].t) / Math.max(1, this.series[this.series.length - 1].t - this.series[0].t)) * 100 : 0, map: 'Position along the real record' },
+          c4: { title: 'Air Temperature', val: this.temp.toFixed(1), unit: '°C', badge: 'ROME 41.9N 12.5E', meter: Math.min(100, Math.max(0, (this.temp + 10) * 2)), map: 'Harmonic tension' },
+          ticker: `Atmosphere (Rome) — sounding the measured record of ${stamp}: wind ${this.windSpeed.toFixed(1)} km/h, gusts ${this.gustSpeed.toFixed(0)} km/h, pressure ${this.pressure.toFixed(1)} hPa (${this.tendency >= 0 ? '+' : ''}${this.tendency.toFixed(2)}/h), ${this.temp.toFixed(1)}°C${this.current ? ` | live now: ${this.current.wind.toFixed(1)} km/h, ${this.current.press.toFixed(0)} hPa` : ''}`
         };
       }
     }
@@ -2303,6 +2734,17 @@
       drawAtmosphere(cx, cy, w, h, time, atmo) {
         this.ctx.save();
         this.ctx.translate(cx, cy);
+
+        // Senza dato reale non si disegna nulla: prima atmo.pressure era null e
+        // il .toFixed piu' in basso lanciava a ogni frame.
+        if (!atmo.live || atmo.pressure === null || atmo.windSpeed === null) {
+          this.ctx.font = '12px JetBrains Mono';
+          this.ctx.fillStyle = 'rgba(255,255,255,0.35)';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('AWAITING OPEN-METEO', 0, 4);
+          this.ctx.restore();
+          return;
+        }
 
         // Wind flow streamlines
         const count = 36;

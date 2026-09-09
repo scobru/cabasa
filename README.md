@@ -20,10 +20,40 @@ Cabasa is a browser-based generative music synthesizer that transforms live data
 3. Press **START CABASA** to begin synthesis
 4. Adjust volume, dynamics, and toggle auto mode as desired
 
-Each data source feeds a different synthesis parameter:
+Each data source feeds several synthesis parameters at once:
 - **Brightness** (filter cutoff)
-- **Harmony** (drone chord shifts)
-- **Amplitude pulsation** (tremolo LFO)
+- **Harmonic tension** (continuous, interpolated between chord shapes)
+- **Drone register** (continuous transposition of the whole drone)
+- **Amplitude pulsation** (tremolo LFO), reverb tail, delay feedback, detune spread
+
+### Continuous mapping
+
+Harmony is not selected from a handful of fixed chords. Providers pass a single
+scalar in `0..1` to `setHarmony()`, which interpolates *in frequency* between two
+adjacent voicings on a nine-step tension ladder, so a datum that drifts by a
+hundredth still moves the drone. `setDroneShift()` does the same for register.
+
+### Real temporality
+
+Two providers replay measured records in compressed time rather than looping on a
+timer, so the *shape* of the data over time is audible, not just its values:
+
+- **Earthquakes** — every event sounds at its true position in the USGS hour
+  (`properties.time`). Swarms stay swarms, quiet stretches stay quiet; the whole
+  hour is compressed into ~25-90 s of listening, and real intervals are preserved
+  proportionally. Quakes that appear between polls ring immediately as live events.
+- **Atmosphere** — traverses the measured hourly series of the last 48 h
+  (wind, gusts, pressure, temperature), interpolated between readings. Forecast
+  hours are excluded: only what was actually recorded is sounded.
+
+The **ISS** position is dead-reckoned along its real ground track between polls, so
+it moves every tick rather than every 5 s, and the day/night boundary is a computed
+solar-elevation sweep across the terminator instead of a binary flag. Note rhythm
+comes from the orbit itself: one note per fixed step of latitude travelled, so notes
+crowd at the equator and thin out at the turning points of the orbit.
+
+No provider substitutes invented values when its source is unavailable — cards go
+blank and say so.
 
 ## Requirements
 
