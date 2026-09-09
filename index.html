@@ -387,6 +387,13 @@
       box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
     }
 
+    .btn-icon.recording {
+      background: rgba(255, 45, 85, 0.14);
+      border-color: rgba(255, 45, 85, 0.5);
+      color: #ff2d55;
+      box-shadow: 0 0 15px rgba(255, 45, 85, 0.2);
+    }
+
     .btn-icon:hover {
       background: rgba(255, 255, 255, 0.12);
       border-color: var(--cyan-neon);
@@ -740,6 +747,11 @@
           <span id="motif-label">MOTIF ON</span>
         </button>
 
+        <button class="btn-icon" id="btn-rec" title="Record the master output to an audio file">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+          <span id="rec-label">REC</span>
+        </button>
+
         <button class="btn-icon" id="btn-auto" title="Randomly change kit and scale every 20 seconds">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg>
           <span id="auto-label">AUTO OFF</span>
@@ -981,6 +993,8 @@
         this.delayRight = null;
         this.delayFeedback = null;
         this.limiter = null;
+        this.recorder = null;
+        this.recDest = null;
 
         this.voices = [];
         this.activeScale = SCALES.lydian;
@@ -1315,6 +1329,35 @@
         const now = this.ctx.currentTime;
         this.voices.forEach(v => {
           v.gain.gain.setTargetAtTime(0.0001, now, 0.3);
+        });
+      }
+
+      // Registrazione: la stessa uscita che va agli altoparlanti viene sdoppiata in
+      // un MediaStream. Nessun re-render offline, nessun ricampionamento: cio' che
+      // finisce nel file e' esattamente cio' che si sente, riverbero e limiter inclusi.
+      startRecording() {
+        if (!this.ctx || this.recorder) return false;
+        if (!this.recDest) {
+          this.recDest = this.ctx.createMediaStreamDestination();
+          this.analyser.connect(this.recDest);
+        }
+        const chunks = [];
+        this.recorder = new MediaRecorder(this.recDest.stream);
+        this.recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+        this.recorder.chunks = chunks;
+        this.recorder.start();
+        return true;
+      }
+
+      // Risolve col Blob finito. MediaRecorder consegna l'ultimo chunk solo dopo
+      // 'stop', quindi la promise e' l'unico modo di non troncare la coda.
+      stopRecording() {
+        const rec = this.recorder;
+        if (!rec) return Promise.resolve(null);
+        this.recorder = null;
+        return new Promise((resolve) => {
+          rec.onstop = () => resolve(new Blob(rec.chunks, { type: rec.mimeType || 'audio/webm' }));
+          rec.stop();
         });
       }
 
@@ -3128,6 +3171,42 @@
         // Riprendendo, si riparte dal passo corrente del clock audio invece che da
         // un nextStepTime vecchio di minuti, che scaricherebbe l'arretrato in blocco.
         if (engine.motifEnabled && engine.ctx) engine.nextStepTime = engine.ctx.currentTime + 0.05;
+      });
+
+      const btnRec = document.getElementById('btn-rec');
+      const recLabel = document.getElementById('rec-label');
+      let recTimer = null;
+
+      btnRec.addEventListener('click', async () => {
+        if (recTimer) {
+          clearInterval(recTimer);
+          recTimer = null;
+          btnRec.classList.remove('recording');
+          recLabel.textContent = 'REC';
+          const blob = await engine.stopRecording();
+          if (!blob) return;
+          // 'audio/webm;codecs=opus' -> webm, 'audio/mp4' -> mp4 (Safari).
+          const ext = (blob.type.split('/')[1] || 'webm').split(';')[0];
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `cabasa-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+          return;
+        }
+        // Senza contesto audio lo stream sarebbe silenzio: si registra solo cio' che suona.
+        if (!engine.startRecording()) {
+          recLabel.textContent = 'START FIRST';
+          setTimeout(() => { recLabel.textContent = 'REC'; }, 1500);
+          return;
+        }
+        const t0 = Date.now();
+        btnRec.classList.add('recording');
+        recLabel.textContent = 'STOP 0:00';
+        recTimer = setInterval(() => {
+          const s = Math.floor((Date.now() - t0) / 1000);
+          recLabel.textContent = `STOP ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        }, 250);
       });
 
       const btnAuto = document.getElementById('btn-auto');

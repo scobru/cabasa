@@ -12,6 +12,7 @@ Cabasa is a browser-based generative music synthesizer that transforms live data
 - **Web Audio API**: polyphonic oscillators, LFO-driven vibrato, low-pass filter, convolution reverb, ping-pong delay, stereo panning, limiter
 - **Canvas Hi-DPI visualizer** with real-time HUD overlay
 - **Auto mode**: randomly changes kit and scale every 20 seconds
+- **Recording**: the REC button captures the master output (post-reverb, post-limiter) to an audio file, downloaded on stop
 
 ## How It Works
 
@@ -19,6 +20,7 @@ Cabasa is a browser-based generative music synthesizer that transforms live data
 2. Choose a modal scale and instrument kit from the control strip
 3. Press **START CABASA** to begin synthesis
 4. Adjust volume, dynamics, and toggle auto mode as desired
+5. Press **REC** to capture what you hear; pressing it again stops and downloads the file
 
 Each data source feeds several synthesis parameters at once:
 - **Brightness** (filter cutoff)
@@ -86,6 +88,15 @@ Two rules keep the phrases learnable while the drone keeps gliding:
   continuously interpolated and is unaffected.
 
 Toggle the layer with the MOTIF button to hear the piece with and without it.
+
+### Recording
+
+`REC` splits the master bus into a `MediaStreamAudioDestinationNode` and hands it to
+`MediaRecorder`. There is no offline re-render and no resampling: the file contains
+exactly the take you heard, reverb tail and limiter included, so a recording of a live
+data run is unrepeatable by design — the ISS was where it was, the quakes fell when
+they fell. The button shows elapsed time while running; on stop the browser downloads
+`cabasa-<timestamp>.webm` (`.mp4` on Safari, whichever codec `MediaRecorder` picks).
 
 ## Requirements
 
