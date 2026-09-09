@@ -735,6 +735,11 @@
       </div>
 
       <div class="controls-right">
+        <button class="btn-icon active" id="btn-motif" title="Repeating melodic phrases in 5/7/11 steps that the data mutates">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span id="motif-label">MOTIF ON</span>
+        </button>
+
         <button class="btn-icon" id="btn-auto" title="Randomly change kit and scale every 20 seconds">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg>
           <span id="auto-label">AUTO OFF</span>
@@ -990,8 +995,137 @@
         // Stato dell'armonia continua: null finche' qualcuno chiama setHarmony.
         this.harmonyTension = null;
         this.harmonyState = null;
+        this.chordRung = null;
         // Trasposizione continua dell'intero drone (rapporto di frequenza).
         this.droneShift = 1;
+
+        // --- Layer melodico -------------------------------------------------
+        // Il pezzo non aveva memoria: ogni nota era un evento irripetibile, quindi
+        // non c'era nulla da riconoscere e nulla che potesse tornare. Qui vivono
+        // tre sequenze che si ripetono, di lunghezza coprima e a velocita' diverse:
+        // ognuna e' riconoscibile, la loro combinazione non si ripete per ore.
+        // I dati non innescano piu' queste note: le mutano.
+        this.motifEnabled = true;
+        this.motifs = [];
+        this.pulseMs = 420;      // passo bersaglio, lo impostano i provider dai dati
+        this.stepMs = 420;       // passo effettivo, insegue pulseMs senza scatti
+        this.stepIndex = 0;
+        this.nextStepTime = 0;
+        this.schedulerId = null;
+        this.motifMutations = 0;
+      }
+
+      // Gradi su cui si muove la melodia: sono i gradi dell'accordo tenuto, piu'
+      // le loro ottave. Cosi' la linea segue l'armonia mentre i dati la spostano,
+      // e resta consonante col drone qualunque cosa succeda.
+      motifPool() {
+        const c = this.chord;
+        const cand = [c[0], c[1], c[2], c[3], c[0] + 7, c[1] + 7, c[2] + 7, c[3] + 7];
+        // I gradi vanno scelti per l'altezza che producono, non per il numero:
+        // degreeFreq riporta le ottave, quindi il grado 14 suona come il 7 e su
+        // accordi larghi come [0,4,7,11] la frase collassava su tre note identiche.
+        const pool = [];
+        const seen = new Set();
+        for (const d of cand) {
+          const key = Math.round(this.degreeFreq(d, 1) * 100);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          pool.push(d);
+          if (pool.length >= 6) break;
+        }
+        return pool.length ? pool : [c[0]];
+      }
+
+      initMotifs() {
+        // Pattern iniziali scritti a mano, non casuali: sono la frase che
+        // l'ascoltatore impara prima che i dati comincino a modificarla.
+        // I numeri indicizzano motifPool(), null e' una pausa.
+        this.motifs = [
+          { len: 5,  div: 2, oct: 2, timbre: 'pluck', gain: 0.9, pan: -0.32,
+            steps: [0, null, 2, 1, null] },
+          { len: 7,  div: 3, oct: 4, timbre: 'bell',  gain: 0.55, pan: 0.38,
+            steps: [4, null, null, 2, null, 5, null] },
+          { len: 11, div: 8, oct: 1, timbre: 'bell',  gain: 0.75, pan: 0.02,
+            steps: [0, null, null, null, 3, null, null, null, 1, null, null] }
+        ];
+        this.motifs.forEach(m => { m.pool = null; m.shift = 1; });
+      }
+
+      // I provider impostano il passo da una grandezza reale. Il valore viene
+      // inseguito gradualmente in scheduleStep: un cambio di tempo e' un respiro,
+      // non uno scatto.
+      setPulse(ms) {
+        if (!Number.isFinite(ms)) return;
+        this.pulseMs = Math.min(1400, Math.max(110, ms));
+      }
+
+      // Il ribaltamento: un evento dai dati riscrive un passo del motivo invece di
+      // suonare una nota isolata. Il seme viene dal dato (magnitudo, byte, quota),
+      // quindi la mutazione e' determinata da cio' che e' successo, non dal caso.
+      mutateMotif(seed) {
+        if (!this.motifs.length || !Number.isFinite(seed)) return;
+        const s = Math.abs(Math.round(seed * 1000));
+        const m = this.motifs[s % this.motifs.length];
+        const idx = (s >> 3) % m.steps.length;
+        const poolLen = this.motifPool().length;
+        // Due valori su otto sono pause: senza respiro la linea impasta e smette
+        // di essere una frase.
+        const val = (s >> 7) % (poolLen + 2);
+        m.steps[idx] = val >= poolLen ? null : val;
+        this.motifMutations++;
+      }
+
+      startScheduler() {
+        if (this.schedulerId || !this.ctx) return;
+        if (!this.motifs.length) this.initMotifs();
+        this.nextStepTime = this.ctx.currentTime + 0.1;
+        // Lookahead: il loop guarda avanti di 140ms e fissa le note a un istante
+        // esatto del clock audio. Il timer di JavaScript non e' abbastanza preciso
+        // per una griglia ritmica; l'orologio di Web Audio si'.
+        this.schedulerId = setInterval(() => {
+          if (!this.ctx || !this.isPlaying || !this.motifEnabled) return;
+          const t = this.ctx.currentTime;
+          // Scheda in background, contesto sospeso: il tempo virtuale resta
+          // indietro di minuti e il while si scaricherebbe addosso mille passi.
+          if (this.nextStepTime < t - 0.5) this.nextStepTime = t + 0.05;
+          while (this.nextStepTime < t + 0.14) {
+            this.scheduleStep(this.stepIndex, this.nextStepTime);
+            this.stepMs += (this.pulseMs - this.stepMs) * 0.12;
+            this.nextStepTime += this.stepMs / 1000;
+            this.stepIndex++;
+          }
+        }, 25);
+      }
+
+      stopScheduler() {
+        if (this.schedulerId) clearInterval(this.schedulerId);
+        this.schedulerId = null;
+      }
+
+      scheduleStep(i, when) {
+        for (const m of this.motifs) {
+          if (i % m.div !== 0) continue;
+          const pos = Math.floor(i / m.div) % m.steps.length;
+          // L'armonia si aggancia all'inizio del ciclo e resta ferma fino alla
+          // fine della frase. Letta nota per nota, l'armonia continua cambiava
+          // l'accordo a meta' motivo: gli intervalli non tornavano mai uguali e
+          // la frase, pur ripetendosi nella struttura, era irriconoscibile.
+          // Cosi' invece il cambio d'armonia cade sulla giunzione fra due cicli,
+          // dove si sente come modulazione anziche' come stonatura.
+          if (pos === 0 || !m.pool) {
+            m.pool = this.motifPool();
+            m.shift = this.droneShift;
+          }
+          const tone = m.steps[pos];
+          if (tone === null || tone === undefined) continue;
+          const freq = this.degreeFreq(m.pool[tone % m.pool.length], m.oct) * m.shift;
+          // Accento morbido sul primo passo del ciclo: e' quello che rende
+          // percepibile la griglia senza trasformarla in un click.
+          const accent = pos === 0 ? 1.25 : 1;
+          const dur = (this.stepMs / 1000) * m.div * 1.7;
+          this.triggerNote(freq, m.pan, dur, m.timbre,
+            { when, gain: m.gain * accent, priority: true });
+        }
       }
 
       setSensitivity(val) {
@@ -1171,11 +1305,13 @@
         this.voices.forEach(v => {
           v.gain.gain.setTargetAtTime(v.targetGain, now, 1.2);
         });
+        this.startScheduler();
       }
 
       pause() {
         if (!this.ctx) return;
         this.isPlaying = false;
+        this.stopScheduler();
         const now = this.ctx.currentTime;
         this.voices.forEach(v => {
           v.gain.gain.setTargetAtTime(0.0001, now, 0.3);
@@ -1229,31 +1365,45 @@
       // ogni valore intermedio produce un'armonia diversa, non uno di tre stati.
       setHarmony(tension, glide = 0.6) {
         const t = Math.min(1, Math.max(0, Number.isFinite(tension) ? tension : 0));
+        // La tensione e' un parametro strutturale e va inseguita piano. Presa
+        // istantanea, seguiva il tremolio del dato e l'armonia cambiava piu' spesso
+        // di quanto la frase melodica facesse in tempo a ripetersi: niente da
+        // riconoscere, quindi niente da ricordare.
+        const prev = this.harmonyTension === null ? t : this.harmonyTension;
+        const sm = prev + (t - prev) * 0.08;
         // Rimappare a ogni tick lo stesso valore riscrive quattro rampe inutili:
         // sotto la soglia di percepibilita' non c'e' nulla da aggiornare.
-        if (this.harmonyState && Math.abs(t - this.harmonyTension) < 0.0004) return;
+        if (this.harmonyState && Math.abs(sm - prev) < 0.0004) return;
         // Stessa curva del filtro, per la stessa ragione: con il clamp duro, a
         // sensibilita' 2.5 tutto sotto 0.2 e sopra 0.8 cadeva sullo stesso accordo,
         // cioe' il difetto che questa modalita' doveva togliere di mezzo.
-        const shaped = 0.5 + 0.5 * Math.tanh((t - 0.5) * this.sensitivity * 1.7);
-        this.harmonyTension = t;
+        const shaped = 0.5 + 0.5 * Math.tanh((sm - 0.5) * this.sensitivity * 1.7);
+        this.harmonyTension = sm;
         const pos = Math.min(1, Math.max(0, shaped)) * (HARMONY_LADDER.length - 1);
         const i = Math.min(HARMONY_LADDER.length - 2, Math.floor(pos));
         const lo = HARMONY_LADDER[i];
         const hi = HARMONY_LADDER[i + 1];
         this.harmonyState = { lo, hi, frac: pos - i };
-        // chord resta il gradino piu' vicino: chi lo legge (device, HUD) trova
-        // sempre gradi interi validi.
-        this.chord = ((pos - i) < 0.5 ? lo : hi).slice();
+        // Il drone resta interpolato in continuo (harmonyState). L'accordo a gradi
+        // interi, che e' quello su cui si costruisce la melodia, si sposta invece
+        // con isteresi: senza, bastava che la tensione oscillasse attorno a un
+        // confine perche' l'accordo sbattesse avanti e indietro a ogni tick.
+        if (this.chordRung === null || Math.abs(pos - this.chordRung) > 0.65) {
+          this.chordRung = Math.round(pos);
+          this.chord = HARMONY_LADDER[this.chordRung].slice();
+        }
         this.applyVoiceFreqs(glide);
       }
 
       // Trasposizione continua del drone. Un dato che scorre (la latitudine ISS,
       // la pressione) puo' cosi' far scivolare tutta l'armonia, non solo colorarla.
       setDroneShift(ratio, glide = 0.8) {
-        const r = Math.min(2, Math.max(0.5, Number.isFinite(ratio) ? ratio : 1));
-        if (Math.abs(r - this.droneShift) < 0.0008) return;
-        this.droneShift = r;
+        const target = Math.min(2, Math.max(0.5, Number.isFinite(ratio) ? ratio : 1));
+        // Il centro tonale e' un parametro strutturale: deve spostarsi lentamente.
+        // Agganciato al valore istantaneo inseguiva il jitter dei frame, e la frase
+        // melodica ripartiva ogni volta da un'altezza leggermente diversa.
+        this.droneShift += (target - this.droneShift) * 0.06;
+        if (Math.abs(target - this.droneShift) < 0.0004) this.droneShift = target;
         this.applyVoiceFreqs(glide);
       }
 
@@ -1280,6 +1430,7 @@
         this.chord = degrees.slice();
         this.harmonyState = null;
         this.harmonyTension = null;
+        this.chordRung = null;
         this.applyVoiceFreqs(glide);
       }
 
@@ -1310,9 +1461,14 @@
 
       // ---- One-shot ---------------------------------------------------------
       // timbre: 'bell' | 'pluck' | 'glitch'
-      triggerNote(freq, pan = 0, duration = 1.2, timbre = 'bell') {
+      // opts.when: istante esatto in cui la nota deve suonare. Senza, si suona
+      // "adesso", che per una linea ritmica significa il jitter del loop a 200ms.
+      // opts.gain: scala d'ampiezza (accenti). opts.priority: la voce melodica ha
+      // un tetto di polifonia piu' alto, altrimenti una raffica di eventi dai dati
+      // le mangerebbe i passi e il motivo si bucherebbe proprio quando serve.
+      triggerNote(freq, pan = 0, duration = 1.2, timbre = 'bell', opts = null) {
         if (!this.ctx || !this.isPlaying) return;
-        if (this.activeOneShots > 26) return; // tetto di polifonia: oltre e' fanghiglia, non musica
+        if (this.activeOneShots > ((opts && opts.priority) ? 34 : 26)) return; // oltre e' fanghiglia, non musica
         if (!isFinite(freq) || freq < 15 || freq > 12000) return;
 
         // Le note one-shot vanno dritte a masterGain, non passano dal filtro:
@@ -1322,7 +1478,9 @@
         // dei registri resta: la nota grave resta la piu' grave del brano.
         while (freq < 110) freq *= 2;
 
-        const now = this.ctx.currentTime;
+        const now = (opts && Number.isFinite(opts.when))
+          ? Math.max(opts.when, this.ctx.currentTime)
+          : this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         const panner = this.ctx.createStereoPanner();
@@ -1330,7 +1488,8 @@
         const k = this.activeKit;
         const v = k[timbre] || k.bell;
         duration = Math.max(0.05, duration * k.dur);
-        const amp = v.amp;
+        // exponentialRamp non puo' puntare a zero: l'ampiezza resta strettamente positiva
+        const amp = Math.max(0.0005, v.amp * ((opts && Number.isFinite(opts.gain)) ? opts.gain : 1));
         // L'attacco non puo' superare la nota: con gli archi (0.3s) su un glitch corto
         // i due eventi finirebbero in ordine invertito sulla stessa AudioParam.
         const attack = Math.min(v.attack, duration * 0.4);
@@ -1536,9 +1695,14 @@
           if (this.battery === null) engine.setTremolo(0.1, 0);
           else engine.setTremolo(this.charging ? 1.8 : 0.25 + this.battery, (1 - this.battery) * 0.5);
 
+          // Macchina sotto sforzo -> passo piu' serrato: il tempo del brano e' il
+          // polso della macchina, non un BPM scelto a tavolino.
+          engine.setPulse(700 - load * 380);
+
           const pulseInterval = Math.max(180, 700 / sens);
           if (!this.lastPulse || (now - this.lastPulse > pulseInterval)) {
             this.lastPulse = now;
+            engine.mutateMotif(this.jitterMs + this.frameJitter);
             const coreIdx = Math.floor(Math.random() * this.cores);
             const deg = engine.chord[coreIdx % engine.chord.length] + (coreIdx % 3 === 0 ? 7 : 4);
             const pan = this.cores > 1 ? -0.85 + (1.7 * (coreIdx / (this.cores - 1))) : 0;
@@ -1630,6 +1794,9 @@
         const freq = this.engine.degreeFreq(byteDiff % 7, octave);
         const pan = (Math.random() * 1.6) - 0.8;
         this.engine.triggerNote(freq, pan, isBot ? 0.22 : 1.6, isBot ? 'glitch' : 'bell');
+        // I byte modificati riscrivono un passo: la voce che senti tornare porta
+        // dentro di se' l'ultima modifica arrivata da Wikipedia.
+        this.engine.mutateMotif(byteDiff);
       }
 
       update() {
@@ -1642,6 +1809,8 @@
         if (this.engine && this.engine.isPlaying) {
           // Traffico globale -> brillantezza: la wiki che si sveglia apre il filtro
           this.engine.setBrightness(0.3 + Math.min(0.7, eps / 40), 0.4);
+          // La wiki che si sveglia accelera la frase
+          this.engine.setPulse(660 - Math.min(1, eps / 35) * 330);
           // Rapporto umani/bot -> tensione armonica continua: piu' bot, piu' cluster.
           // Con tre accordi fissi il colore restava identico per minuti interi.
           const h = humanPct / 100;
@@ -1695,6 +1864,8 @@
           this.engine.setBrightness(Math.min(1, Math.max(0, (this.x + 22) / 44)), 0.08);
 
           const normZ = Math.min(1, Math.max(0, this.z / 50));
+          // Velocita' lungo la traiettoria -> passo: il caos detta il tempo
+          this.engine.setPulse(620 - Math.min(1, speed * 2.2) * 300);
           // Clamp a 0.55: oltre, con il ping-pong, l'anello si autoalimenta
           this.engine.delayFeedback.gain.setTargetAtTime(0.2 + (normZ * 0.35), now, 0.1);
 
@@ -1706,6 +1877,9 @@
           const curSign = Math.sign(this.x);
           if (this.lastSign !== undefined && curSign !== 0 && curSign !== this.lastSign) {
             this.engine.triggerNote(this.engine.degreeFreq(Math.floor(normZ * 7), 2), curSign * 0.8, 0.9, 'pluck');
+            // Il salto fra le ali della farfalla e' l'evento strutturale
+            // dell'attrattore: e' li' che la frase cambia.
+            this.engine.mutateMotif(this.z);
           }
           this.lastSign = curSign;
 
@@ -1873,6 +2047,9 @@
           // Latitudine -> tensione armonica continua. L'inclinazione dell'orbita e'
           // 51.6 gradi: normalizzo su quella, cosi' l'intera corsa e' sfruttata.
           this.engine.setHarmony(Math.min(1, absLat / 51.6), 0.9);
+          // All'equatore la latitudine corre e la frase si stringe; ai vertici
+          // dell'orbita rallenta. Il tempo del brano e' il moto della stazione.
+          this.engine.setPulse(320 + (absLat / 51.6) * 520);
           // ...e trasposizione continua del drone: salendo verso nord tutta
           // l'armonia scivola in alto, di circa una quinta da polo a polo.
           this.engine.setDroneShift(Math.pow(2, (this.lat / 90) * (7 / 12)), 1.0);
@@ -1893,6 +2070,7 @@
           if (this.lastNoteLat === null) this.lastNoteLat = this.lat;
           if (Math.abs(this.lat - this.lastNoteLat) >= stepDeg) {
             this.lastNoteLat = this.lat;
+            this.engine.mutateMotif(this.lat * 7);
             const pan = Math.max(-1, Math.min(1, this.lon / 180));
             this.engine.triggerNote(
               this.engine.degreeFreq(Math.floor((absLat / 51.6) * 7), dayness > 0.5 ? 4 : 2),
@@ -2035,6 +2213,9 @@
         this.meanDepth = (this.meanDepth * 0.85) + (Math.max(0, q.depth) * 0.15);
 
         if (!this.engine || !this.engine.isPlaying) return;
+        // La magnitudo riscrive un passo: dopo uno sciame la frase non e' piu'
+        // quella di prima, e lo si sente senza guardare le schede.
+        this.engine.mutateMotif(q.mag * 100 + Math.abs(q.lon));
         const sens = this.engine.sensitivity || 1.5;
         const pan = Math.max(-1, Math.min(1, q.lon / 180));
         const basePitch = this.engine.activeScale.base * (q.mag > 3.0 ? 0.75 : 1.5);
@@ -2099,6 +2280,8 @@
           const audioNow = this.engine.ctx.currentTime;
           // Brillantezza: energia sismica accumulata, non il conteggio a gradini
           this.engine.setBrightness(0.22 + this.energy * 0.68, 0.5);
+          // Pianeta in attivita' -> frase piu' serrata
+          this.engine.setPulse(780 - this.energy * 400);
           // Tensione armonica continua fra la sismicita' di fondo e il picco dell'ora
           // count e maxMag cambiano solo al refetch (20s): da soli tenevano
           // l'armonia immobile fra un poll e l'altro. L'energia accumulata la fa
@@ -2185,6 +2368,7 @@
                 const octave = Math.pow(2, Math.floor(r / 6));
                 const pan = (c / this.cols) * 1.6 - 0.8;
                 this.engine.triggerNote(this.engine.degreeFreq(c % 7, octave * 2), pan, 0.7, 'pluck');
+                this.engine.mutateMotif((r * this.cols) + c);
                 triggeredNotes++;
               }
             } else {
@@ -2221,6 +2405,8 @@
           // della popolazione si sentono come apertura/chiusura e cambio di armonia.
           this.engine.setBrightness(0.2 + Math.min(0.8, dens * 2.6), 0.25);
           this.engine.setHarmony(Math.min(1, dens * 3), 0.5);
+          // Colonia fitta -> frase serrata; colonia che collassa -> frase rada
+          this.engine.setPulse(720 - Math.min(1, dens * 3) * 380);
         }
 
         return {
@@ -2365,6 +2551,8 @@
           // Vento -> brillantezza; turbolenza -> profondita' del tremolo
           this.engine.setBrightness(0.15 + windNorm * 0.8, 0.35);
           this.engine.setTremolo(0.2 + windNorm * 2.6, gustiness * 0.4);
+          // Il vento misurato detta il passo: la frase accelera nella burrasca
+          this.engine.setPulse(800 - windNorm * 430);
 
           // Pressione -> coda del riverbero, in continuo lungo il barografo
           const pressNorm = Math.min(1, Math.max(0, (this.pressure - 985) / 45));
@@ -2386,6 +2574,7 @@
             const degree = Math.floor(Math.abs(this.pressure * 10) % 7);
             const pan = Math.max(-0.85, Math.min(0.85, this.tendency * 0.6));
             this.engine.triggerNote(this.engine.degreeFreq(degree, this.temp > 18 ? 4 : 2), pan, 1.4, 'bell');
+            this.engine.mutateMotif(this.pressure * 3);
           }
         }
 
@@ -2930,6 +3119,17 @@
       // Modalita' AUTO: sorteggia kit e scala. Dispatcho 'change' sui select
       // esistenti invece di richiamare l'engine: un solo percorso, HUD e UI
       // restano allineati da soli.
+      const btnMotif = document.getElementById('btn-motif');
+      const motifLabel = document.getElementById('motif-label');
+      btnMotif.addEventListener('click', () => {
+        engine.motifEnabled = !engine.motifEnabled;
+        btnMotif.classList.toggle('active', engine.motifEnabled);
+        motifLabel.textContent = engine.motifEnabled ? 'MOTIF ON' : 'MOTIF OFF';
+        // Riprendendo, si riparte dal passo corrente del clock audio invece che da
+        // un nextStepTime vecchio di minuti, che scaricherebbe l'arretrato in blocco.
+        if (engine.motifEnabled && engine.ctx) engine.nextStepTime = engine.ctx.currentTime + 0.05;
+      });
+
       const btnAuto = document.getElementById('btn-auto');
       const autoLabel = document.getElementById('auto-label');
       let autoTimer = null;

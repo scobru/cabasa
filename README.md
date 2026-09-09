@@ -55,6 +55,38 @@ crowd at the equator and thin out at the turning points of the orbit.
 No provider substitutes invented values when its source is unavailable — cards go
 blank and say so.
 
+### Melodic memory
+
+Every note used to be a one-off event triggered by a datum, so nothing ever came
+back and there was nothing for the ear to recognise. Three looping phrases now run
+underneath, of coprime length and different speed:
+
+| Voice | Steps | One note every | Register |
+| :---- | :---- | :------------- | :------- |
+| A | 5 | 2 grid steps | mid, plucked |
+| B | 7 | 3 grid steps | high, bell |
+| C | 11 | 8 grid steps | low, bell |
+
+Each repeats and is recognisable on its own; their combination does not return for
+hours. **The data no longer triggers these notes — it mutates them.** A quake, a
+Wikipedia edit, a Lorenz wing crossing rewrites one step of one phrase, seeded by the
+value itself, so the melody you have learned audibly changes when something happens.
+
+The grid step is set by the data too (`setPulse`), never by a fixed BPM: orbital
+latitude rate, seismic energy, wind speed, edits per second, machine load. Notes are
+scheduled against the Web Audio clock with a 140 ms lookahead, so the grid is exact
+to the sample while its tempo breathes with the source.
+
+Two rules keep the phrases learnable while the drone keeps gliding:
+
+- The harmony is **latched at the start of each phrase**, so a chord change lands on
+  the seam between cycles as a modulation rather than mid-phrase as a wrong note.
+- The integer chord the melody is built from moves with **hysteresis**, so tension
+  hovering near a boundary cannot make it chatter. The drone itself stays
+  continuously interpolated and is unaffected.
+
+Toggle the layer with the MOTIF button to hear the piece with and without it.
+
 ## Requirements
 
 - Modern web browser with Web Audio API support
