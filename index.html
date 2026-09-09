@@ -981,6 +981,29 @@
       [0, 1, 6, 8]   // cluster
     ];
 
+    // WAV 16 bit PCM stereo. 44 byte di header piu' i campioni: nessuna
+    // libreria, e il file entra in qualunque DAW senza conversioni.
+    function encodeWav(ch, rate) {
+      const n = ch[0].reduce((a, b) => a + b.length, 0);
+      const buf = new ArrayBuffer(44 + n * 4), v = new DataView(buf);
+      const str = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+      str(0, 'RIFF'); v.setUint32(4, 36 + n * 4, true); str(8, 'WAVEfmt ');
+      v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+      v.setUint32(24, rate, true); v.setUint32(28, rate * 4, true);
+      v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+      str(36, 'data'); v.setUint32(40, n * 4, true);
+      let o = 44;
+      for (let b = 0; b < ch[0].length; b++) {
+        const l = ch[0][b], r = ch[1][b];
+        for (let i = 0; i < l.length; i++) {
+          v.setInt16(o, Math.max(-1, Math.min(1, l[i])) * 32767, true);
+          v.setInt16(o + 2, Math.max(-1, Math.min(1, r[i])) * 32767, true);
+          o += 4;
+        }
+      }
+      return new Blob([buf], { type: 'audio/wav' });
+    }
+
     class CabasaAudioEngine {
       constructor() {
         this.ctx = null;
@@ -993,8 +1016,9 @@
         this.delayRight = null;
         this.delayFeedback = null;
         this.limiter = null;
-        this.recorder = null;
-        this.recDest = null;
+        this.recNode = null;
+        this.recSink = null;
+        this.recChunks = null;
 
         this.voices = [];
         this.activeScale = SCALES.lydian;
@@ -1332,33 +1356,41 @@
         });
       }
 
-      // Registrazione: la stessa uscita che va agli altoparlanti viene sdoppiata in
-      // un MediaStream. Nessun re-render offline, nessun ricampionamento: cio' che
-      // finisce nel file e' esattamente cio' che si sente, riverbero e limiter inclusi.
+      // Registrazione: l'uscita master viene letta campione per campione e scritta
+      // in un WAV 16 bit. MediaRecorder darebbe Opus, cioe' un file gia' degradato:
+      // una presa dal vivo su dati reali non e' ripetibile, quindi non puo' permettersi
+      // una ricompressa. ScriptProcessor e' deprecato ma non richiede un file worklet
+      // esterno, che una pagina aperta da disco non sempre riesce a caricare.
       startRecording() {
-        if (!this.ctx || this.recorder) return false;
-        if (!this.recDest) {
-          this.recDest = this.ctx.createMediaStreamDestination();
-          this.analyser.connect(this.recDest);
-        }
-        const chunks = [];
-        this.recorder = new MediaRecorder(this.recDest.stream);
-        this.recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-        this.recorder.chunks = chunks;
-        this.recorder.start();
+        if (!this.ctx || this.recNode) return false;
+        this.recChunks = [[], []];
+        this.recNode = this.ctx.createScriptProcessor(4096, 2, 2);
+        this.recNode.onaudioprocess = (e) => {
+          for (let c = 0; c < 2; c++) {
+            this.recChunks[c].push(new Float32Array(e.inputBuffer.getChannelData(c)));
+          }
+        };
+        // Un ScriptProcessor viene chiamato solo se raggiunge l'uscita: sink muto.
+        this.recSink = this.ctx.createGain();
+        this.recSink.gain.value = 0;
+        this.analyser.connect(this.recNode);
+        this.recNode.connect(this.recSink);
+        this.recSink.connect(this.ctx.destination);
         return true;
       }
 
-      // Risolve col Blob finito. MediaRecorder consegna l'ultimo chunk solo dopo
-      // 'stop', quindi la promise e' l'unico modo di non troncare la coda.
+      // Sincrona: i campioni sono gia' tutti in memoria, non c'e' un encoder
+      // asincrono da attendere come con MediaRecorder.
       stopRecording() {
-        const rec = this.recorder;
-        if (!rec) return Promise.resolve(null);
-        this.recorder = null;
-        return new Promise((resolve) => {
-          rec.onstop = () => resolve(new Blob(rec.chunks, { type: rec.mimeType || 'audio/webm' }));
-          rec.stop();
-        });
+        if (!this.recNode) return null;
+        this.recNode.onaudioprocess = null;
+        this.recNode.disconnect();
+        this.recSink.disconnect();
+        this.recNode = null;
+        this.recSink = null;
+        const wav = encodeWav(this.recChunks, this.ctx.sampleRate);
+        this.recChunks = null;
+        return wav;
       }
 
       // ---- Mappature udibili ----------------------------------------------
@@ -3177,23 +3209,26 @@
       const recLabel = document.getElementById('rec-label');
       let recTimer = null;
 
-      btnRec.addEventListener('click', async () => {
-        if (recTimer) {
-          clearInterval(recTimer);
-          recTimer = null;
-          btnRec.classList.remove('recording');
-          recLabel.textContent = 'REC';
-          const blob = await engine.stopRecording();
-          if (!blob) return;
-          // 'audio/webm;codecs=opus' -> webm, 'audio/mp4' -> mp4 (Safari).
-          const ext = (blob.type.split('/')[1] || 'webm').split(';')[0];
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = `cabasa-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-          return;
-        }
+      // Il WAV non compresso pesa ~10 MB/minuto: oltre i 10 minuti la presa si
+      // chiude da sola invece di far crescere l'array finche' la scheda muore.
+      const REC_MAX = 600;
+
+      const recFinish = () => {
+        clearInterval(recTimer);
+        recTimer = null;
+        btnRec.classList.remove('recording');
+        recLabel.textContent = 'REC';
+        const wav = engine.stopRecording();
+        if (!wav) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(wav);
+        a.download = `cabasa-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.wav`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+      };
+
+      btnRec.addEventListener('click', () => {
+        if (recTimer) return recFinish();
         // Senza contesto audio lo stream sarebbe silenzio: si registra solo cio' che suona.
         if (!engine.startRecording()) {
           recLabel.textContent = 'START FIRST';
@@ -3205,6 +3240,7 @@
         recLabel.textContent = 'STOP 0:00';
         recTimer = setInterval(() => {
           const s = Math.floor((Date.now() - t0) / 1000);
+          if (s >= REC_MAX) return recFinish();
           recLabel.textContent = `STOP ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
         }, 250);
       });

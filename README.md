@@ -12,7 +12,7 @@ Cabasa is a browser-based generative music synthesizer that transforms live data
 - **Web Audio API**: polyphonic oscillators, LFO-driven vibrato, low-pass filter, convolution reverb, ping-pong delay, stereo panning, limiter
 - **Canvas Hi-DPI visualizer** with real-time HUD overlay
 - **Auto mode**: randomly changes kit and scale every 20 seconds
-- **Recording**: the REC button captures the master output (post-reverb, post-limiter) to an audio file, downloaded on stop
+- **Recording**: the REC button captures the master output (post-reverb, post-limiter) to a 16-bit WAV, downloaded on stop
 
 ## How It Works
 
@@ -91,12 +91,16 @@ Toggle the layer with the MOTIF button to hear the piece with and without it.
 
 ### Recording
 
-`REC` splits the master bus into a `MediaStreamAudioDestinationNode` and hands it to
-`MediaRecorder`. There is no offline re-render and no resampling: the file contains
-exactly the take you heard, reverb tail and limiter included, so a recording of a live
-data run is unrepeatable by design — the ISS was where it was, the quakes fell when
-they fell. The button shows elapsed time while running; on stop the browser downloads
-`cabasa-<timestamp>.webm` (`.mp4` on Safari, whichever codec `MediaRecorder` picks).
+`REC` reads the master bus sample by sample through a `ScriptProcessorNode` and
+writes a 16-bit stereo WAV. `MediaRecorder` was the shorter route but only offers
+Opus: a take driven by live data cannot be repeated, so it cannot afford a lossy
+pass either. There is no offline re-render and no resampling — the file holds
+exactly the take you heard, reverb tail and limiter included, because the ISS was
+where it was and the quakes fell when they fell.
+
+The button counts the elapsed time while running; on stop the browser downloads
+`cabasa-<timestamp>.wav`. Uncompressed stereo runs about 10 MB per minute, so a
+take closes itself at ten minutes rather than growing until the tab dies.
 
 ## Requirements
 
