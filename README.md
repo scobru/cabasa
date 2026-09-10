@@ -98,6 +98,17 @@ data run is unrepeatable by design — the ISS was where it was, the quakes fell
 they fell. The button shows elapsed time while running; on stop the browser downloads
 `cabasa-<timestamp>.webm` (`.mp4` on Safari, whichever codec `MediaRecorder` picks).
 
+## Layout
+
+One stylesheet, two breakpoints. Below 760px the stage tracks the viewport
+instead of sitting at a fixed 380px, the control strip becomes a single column
+of aligned rows with full-width selects, the telemetry cards go two-up, and the
+canvas HUD drops the three lines a phone already shows elsewhere — source is the
+active tab, scale and kit are the two selects — so it stops covering the
+visualisation. Tap targets are 44px and hover effects are gated behind
+`@media (hover: hover)`, so a tapped card does not stay lit. Below 380px the
+type and padding tighten again. Nothing above 760px changed.
+
 ## Requirements
 
 - Modern web browser with Web Audio API support

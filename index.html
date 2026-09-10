@@ -195,9 +195,11 @@
       white-space: nowrap;
     }
 
-    .source-tab:hover {
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text-main);
+    @media (hover: hover) {
+      .source-tab:hover {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-main);
+      }
     }
 
     .source-tab.active {
@@ -323,10 +325,12 @@
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    .btn-start:hover {
-      transform: scale(1.05);
-      background: linear-gradient(135deg, rgba(0, 240, 255, 0.4), rgba(168, 85, 247, 0.4));
-      box-shadow: 0 0 50px rgba(0, 240, 255, 0.6);
+    @media (hover: hover) {
+      .btn-start:hover {
+        transform: scale(1.05);
+        background: linear-gradient(135deg, rgba(0, 240, 255, 0.4), rgba(168, 85, 247, 0.4));
+        box-shadow: 0 0 50px rgba(0, 240, 255, 0.6);
+      }
     }
 
     .btn-start svg {
@@ -394,10 +398,12 @@
       box-shadow: 0 0 15px rgba(255, 45, 85, 0.2);
     }
 
-    .btn-icon:hover {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: var(--cyan-neon);
-      color: var(--cyan-neon);
+    @media (hover: hover) {
+      .btn-icon:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: var(--cyan-neon);
+        color: var(--cyan-neon);
+      }
     }
 
     .slider-group {
@@ -467,9 +473,11 @@
       transition: transform 0.2s, border-color 0.2s;
     }
 
-    .telemetry-card:hover {
-      border-color: rgba(0, 240, 255, 0.35);
-      transform: translateY(-2px);
+    @media (hover: hover) {
+      .telemetry-card:hover {
+        border-color: rgba(0, 240, 255, 0.35);
+        transform: translateY(-2px);
+      }
     }
 
     .card-top {
@@ -573,9 +581,11 @@
       transition: color 0.2s, border-color 0.2s;
     }
 
-    footer a:hover {
-      color: var(--cyan-neon);
-      border-color: var(--cyan-neon);
+    @media (hover: hover) {
+      footer a:hover {
+        color: var(--cyan-neon);
+        border-color: var(--cyan-neon);
+      }
     }
 
     footer a svg {
@@ -596,6 +606,232 @@
       padding: 0.25rem 0.6rem;
       border-radius: 6px;
       color: var(--cyan-neon);
+    }
+
+    /* ---- Mobile ---------------------------------------------------------
+       The page had no media query at all: it was the desktop layout scaled
+       down. A stage locked at 380px, a HUD covering half the canvas, selects
+       clipped at 260px and 30px tap targets. Layout only below — no colours,
+       no behaviour, no change to the audio path. */
+    @media (max-width: 760px) {
+      .app-container {
+        padding: 1rem;
+        gap: 1rem;
+      }
+
+      /* The badge used to wrap onto its own line and sit there orphaned.
+         Title and badge share the top row; the tagline ellipsises instead. */
+      header {
+        flex-wrap: nowrap;
+        align-items: flex-start;
+        gap: 0.7rem;
+      }
+
+      .brand { flex: 1; min-width: 0; }
+      .brand-text { min-width: 0; }
+      .brand-text h1 { font-size: 1.15rem; }
+
+      .brand-text p {
+        font-size: 0.62rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .logo-icon { width: 34px; height: 34px; border-radius: 10px; }
+      .logo-icon svg { width: 20px; height: 20px; }
+      .status-badge { flex-shrink: 0; }
+
+      /* A horizontal scroller should look like one: the tabs were cut
+         mid-word at both edges with nothing to say they continued. */
+      .source-tabs {
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+        mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+      }
+
+      .source-tab {
+        scroll-snap-align: center;
+        min-height: 44px;
+      }
+
+      /* 380px was two thirds of a short phone. Track the viewport instead. */
+      .visualizer-wrapper {
+        height: min(48vh, 380px);
+        min-height: 240px;
+        border-radius: 14px;
+      }
+
+      /* The HUD sat on top of the visualisation and hid it. Source, scale and
+         kit are already on screen — the active tab and the two selects say
+         all three — so the phone keeps only what nothing else reports. */
+      .canvas-overlay-hud {
+        top: 0.6rem;
+        left: 0.6rem;
+        font-size: 0.62rem;
+        line-height: 1.45;
+        padding: 0.35rem 0.55rem;
+        max-width: calc(100% - 1.2rem);
+      }
+
+      .canvas-overlay-hud .hud-line--secondary { display: none; }
+
+      /* The ticker is a sentence, not a label. Two lines beat ellipsing it
+         after a third of the text. */
+      .ticker-bar {
+        left: 0.6rem;
+        right: 0.6rem;
+        bottom: 0.6rem;
+        padding: 0.35rem 0.6rem;
+      }
+
+      .ticker-text {
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-height: 1.35;
+      }
+
+      .btn-start { font-size: 1rem; padding: 0.85rem 1.6rem; }
+      .btn-start svg { width: 18px; height: 18px; }
+      .start-subtext { font-size: 0.72rem; }
+      .transport-overlay { gap: 1rem; padding: 1rem; }
+
+      /* One column of aligned rows instead of a ragged wrap: space-between
+         left every label at a different indent. */
+      .controls-strip {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0.8rem;
+        gap: 0.7rem;
+      }
+
+      .controls-left {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        gap: 0.7rem;
+      }
+
+      .slider-group {
+        display: grid;
+        grid-template-columns: 4.6rem minmax(0, 1fr) 2.6rem;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .slider-group input[type="range"] { width: 100%; }
+
+      /* The option labels run to 41 characters. Sharing the row with a label
+         column left no width for them and the browser cut them mid-word, so
+         on a phone the label goes above and the control takes the whole row. */
+      .slider-group.select-group {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.3rem;
+      }
+
+      .slider-group.select-group > span { letter-spacing: 0.08em; }
+
+      /* max-width: 260px is what clipped "Vetro & Campane (Cristallino)",
+         and what pushed the page past the viewport at 320px. */
+      .mood-select {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        min-height: 44px;
+        font-size: 0.7rem;
+      }
+
+      /* A 4px-tall track is not something a thumb can catch. Same look, a
+         hit area you can actually hit. */
+      .slider-group input[type="range"] {
+        height: 26px;
+        background: transparent;
+      }
+
+      .slider-group input[type="range"]::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .slider-group input[type="range"]::-webkit-slider-thumb {
+        width: 18px;
+        height: 18px;
+        margin-top: -7px;
+      }
+
+      .slider-group input[type="range"]::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .slider-group input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border: none;
+        border-radius: 50%;
+        background: var(--cyan-neon);
+        box-shadow: 0 0 8px var(--cyan-neon);
+      }
+
+      /* Four buttons wrapped 3 + 1 and left FULLSCREEN alone on a row. */
+      .controls-right {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 0.6rem;
+      }
+
+      .btn-icon {
+        min-height: 44px;
+        justify-content: center;
+        padding: 0.5rem 0.6rem;
+      }
+
+      /* minmax(240px) forced one card per row: four screens of scrolling for
+         four numbers. Below ~330px of content it still collapses to one. */
+      .telemetry-grid {
+        grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+        gap: 0.7rem;
+      }
+
+      .telemetry-card { padding: 0.85rem; gap: 0.45rem; }
+
+      .card-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+      }
+
+      .card-title { font-size: 0.68rem; }
+      .card-badge { font-size: 0.6rem; }
+      .card-metric { font-size: 1.35rem; }
+      .card-sound-map { font-size: 0.66rem; }
+
+      footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.6rem;
+        padding-top: 1rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .app-container { padding: 0.8rem; }
+      .brand-text h1 { font-size: 1rem; letter-spacing: 0.1em; }
+      .status-badge { padding: 0.3rem 0.6rem; font-size: 0.65rem; }
+      .btn-start { font-size: 0.9rem; padding: 0.8rem 1.2rem; }
+
+      .slider-group {
+        grid-template-columns: 4rem minmax(0, 1fr) 2.4rem;
+        gap: 0.45rem;
+        font-size: 0.66rem;
+      }
     }
   </style>
 </head>
@@ -665,11 +901,11 @@
       <canvas id="visualizer-canvas"></canvas>
       
       <div class="canvas-overlay-hud">
-        <div class="hud-line">SOURCE: <span class="hud-val" id="hud-source">DEVICE HARDWARE</span></div>
+        <div class="hud-line hud-line--secondary">SOURCE: <span class="hud-val" id="hud-source">DEVICE HARDWARE</span></div>
         <div class="hud-line">ENGINE: <span class="hud-val" id="hud-engine">STANDBY</span></div>
         <div class="hud-line">POLYPHONY: <span class="hud-val" id="hud-polyphony">0 VOICES</span></div>
-        <div class="hud-line">SCALE: <span class="hud-val" id="hud-scale">ETHEREAL LYDIAN</span></div>
-        <div class="hud-line">KIT: <span class="hud-val" id="hud-kit">VETRO &amp; CAMPANE</span></div>
+        <div class="hud-line hud-line--secondary">SCALE: <span class="hud-val" id="hud-scale">ETHEREAL LYDIAN</span></div>
+        <div class="hud-line hud-line--secondary">KIT: <span class="hud-val" id="hud-kit">VETRO &amp; CAMPANE</span></div>
       </div>
 
       <div class="ticker-bar" id="ticker-bar">
@@ -710,7 +946,7 @@
           <span id="sensitivity-val">1.5x</span>
         </div>
 
-        <div class="slider-group">
+        <div class="slider-group select-group">
           <span>KIT</span>
           <select class="mood-select" id="select-kit">
             <option value="glass">1. Vetro &amp; Campane (Cristallino)</option>
@@ -722,7 +958,7 @@
           </select>
         </div>
 
-        <div class="slider-group">
+        <div class="slider-group select-group">
           <span>SCALA</span>
           <select class="mood-select" id="select-mood">
             <option value="lydian">1. Ethereal Lydian (Ambient Mistico)</option>
@@ -3097,6 +3333,9 @@
 
           document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
           tab.classList.add('active');
+          // On a phone the tab strip is a scroller and the tab you just picked
+          // is usually half off the edge: bring it back into view.
+          tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
           if (activeSource === 'wikipedia') providers.wiki.stop();
 
