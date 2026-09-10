@@ -114,7 +114,27 @@ index.html — single-file application
        ├── Data providers — fetch & normalize live data
        ├── Visualizer — Canvas 2D rendering
        └── UI controllers — sliders, selects, buttons
+test.js — musical logic tests, no dependencies
 ```
+
+## Tests
+
+```
+node test.js
+```
+
+The app stays one file, so the tests read `index.html` and evaluate the blocks
+between `// >>> MUSIC` and `// <<< MUSIC` markers: the scales and the audio
+engine, the Lorenz attractor with the solar-elevation helper, and the automaton.
+The engine is built with `ctx = null` — every method that touches Web Audio
+returns early on that — so the musical arithmetic runs under Node while the
+sound-producing half stays inert. No test opens an `AudioContext`.
+
+What they cover is the half that fails without throwing: harmony that must rise
+with the datum and never leave the ladder, a drone shift that transposes instead
+of detuning, motif mutations that stay playable, an attractor that stays on the
+attractor, B3/S23 on a torus, and the sun at the right height. If you move a
+marker, move it to a boundary that still encloses whole declarations.
 
 ## License
 
