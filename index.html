@@ -849,6 +849,7 @@
      * 7 Data Providers & 12 Curated Musical Scales
      */
 
+    // >>> MUSIC core
     const SCALES = {
       lydian: {
         name: 'Ethereal Lydian',
@@ -863,7 +864,10 @@
       deepdrone: {
         name: 'Deep Core Sus2',
         base: 43.65, // F1
-        ratios: [1, 9/8, 4/3, 3/2, 9/4, 2, 3, 4, 9/2, 6, 8]
+        // 9/4 stava prima di 2: la tabella scendeva fra il grado 4 e il 5, quindi
+        // degreeFreq non era piu' monotona e su questa scala l'accordo [0,4,7,11]
+        // suonava con la terza voce sotto la seconda. Stesse altezze, ordine giusto.
+        ratios: [1, 9/8, 4/3, 3/2, 2, 9/4, 3, 4, 9/2, 6, 8]
       },
       hirajoshi: {
         name: 'Hirajoshi Minimal',
@@ -1635,6 +1639,7 @@
         osc.stop(now + duration + 0.1);
       }
     }
+    // <<< MUSIC
 
     // PROVIDER 1: Device Hardware
     class DeviceMonitor {
@@ -1872,6 +1877,7 @@
     }
 
     // PROVIDER 3: Lorenz Chaos Attractor
+    // >>> MUSIC chaos
     class LorenzChaos {
       constructor(engine) {
         this.engine = engine;
@@ -1962,6 +1968,7 @@
       );
       return el / rad;
     }
+    // <<< MUSIC
 
     // PROVIDER 4: ISS Orbit Live
     // Il poll e' ogni 5s e la latitudine si muove di frazioni di grado: mappata su
@@ -2355,6 +2362,7 @@
     }
 
     // PROVIDER 6: Conway's Game of Life (Cellular Automata)
+    // >>> MUSIC life
     class GameOfLifeEngine {
       constructor(engine) {
         this.engine = engine;
@@ -2461,6 +2469,7 @@
         };
       }
     }
+    // <<< MUSIC
 
     // PROVIDER 7: Atmosphere & Wind (Open-Meteo)
     // Il movimento udibile veniva da due seni sul tempo: il dato Open-Meteo fissava
