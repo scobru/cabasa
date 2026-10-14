@@ -28,6 +28,15 @@ Each data source feeds several synthesis parameters at once:
 - **Drone register** (continuous transposition of the whole drone)
 - **Amplitude pulsation** (tremolo LFO), reverb tail, delay feedback, detune spread
 
+### Learned melodic motion
+
+When a datum rewrites a motif step, the new note is not drawn at random from the
+chord: it moves from the previous note by a melodic interval learned by
+[Distant Worlds](https://github.com/scobru/distant-worlds) (`tools/learn-music.mjs`)
+from 178 game-soundtrack MIDI files, statistics only. Calm data (low harmonic
+tension) uses the ballad intervals, tense data the tense ones, the middle the
+dreamy ones.
+
 ### Continuous mapping
 
 Harmony is not selected from a handful of fixed chords. Providers pass a single

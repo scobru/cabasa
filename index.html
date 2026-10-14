@@ -1221,6 +1221,16 @@
       [0, 1, 6, 8]   // cluster
     ];
 
+    // Intervalli melodici (semitoni -> peso) imparati da distant-worlds
+    // (tools/learn-music.mjs) su 178 colonne sonore di videogiochi in MIDI: solo
+    // statistiche, nessuna nota. Una mutazione si muove come una melodia scritta,
+    // non salta a caso nel pool. Lo stile segue la tensione armonica dei dati.
+    const LEARNED_IV = {
+      ballad: [[-12,143],[-11,12],[-10,11],[-9,24],[-8,81],[-7,104],[-6,25],[-5,131],[-4,166],[-3,156],[-2,587],[-1,331],[0,440],[1,363],[2,521],[3,201],[4,204],[5,155],[6,6],[7,61],[8,72],[9,26],[10,16],[11,8],[12,157]],
+      dreamy: [[-12,171],[-11,9],[-10,15],[-9,45],[-8,51],[-7,124],[-6,43],[-5,242],[-4,308],[-3,350],[-2,817],[-1,504],[0,968],[1,510],[2,824],[3,366],[4,278],[5,266],[6,51],[7,153],[8,67],[9,54],[10,25],[11,9],[12,151]],
+      tense: [[-12,178],[-11,8],[-10,4],[-9,34],[-8,36],[-7,116],[-6,44],[-5,217],[-4,196],[-3,179],[-2,481],[-1,401],[0,869],[1,387],[2,445],[3,246],[4,184],[5,227],[6,55],[7,127],[8,51],[9,49],[10,25],[11,11],[12,131]]
+    };
+
     class CabasaAudioEngine {
       constructor() {
         this.ctx = null;
@@ -1324,9 +1334,27 @@
         const poolLen = this.motifPool().length;
         // Due valori su otto sono pause: senza respiro la linea impasta e smette
         // di essere una frase.
-        const val = (s >> 7) % (poolLen + 2);
-        m.steps[idx] = val >= poolLen ? null : val;
+        if ((s >> 7) % (poolLen + 2) >= poolLen) m.steps[idx] = null;
+        else m.steps[idx] = this.learnedStep(m.steps, idx, ((s >> 10) % 997) / 997);
         this.motifMutations++;
+      }
+
+      // La nota dopo quella che precede idx nel motivo, a un intervallo appreso:
+      // u in 0..1 sceglie l'intervallo per peso, poi vince la nota del pool piu'
+      // vicina in altezza. Indice nel pool, come gli altri passi.
+      learnedStep(steps, idx, u) {
+        const pool = this.motifPool(), st = (d) => 12 * Math.log2(this.degreeFreq(d, 1));
+        let prev = null;
+        for (let k = 1; k <= steps.length && prev === null; k++) prev = steps[(idx - k + steps.length) % steps.length];
+        if (prev === null) return Math.floor(u * pool.length);
+        const t = this.harmonyTension ?? 0.5;
+        const iv = LEARNED_IV[t >= 0.6 ? 'tense' : t < 0.3 ? 'ballad' : 'dreamy'];
+        let x = u * iv.reduce((a, p) => a + p[1], 0), move = 0;
+        for (const [v, w] of iv) if ((x -= w) < 0) { move = v; break; }
+        const target = st(pool[prev % pool.length]) + move;
+        let best = 0;
+        pool.forEach((d, i) => { if (Math.abs(st(d) - target) < Math.abs(st(pool[best]) - target)) best = i; });
+        return best;
       }
 
       startScheduler() {

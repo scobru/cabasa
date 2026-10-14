@@ -357,6 +357,22 @@ test("a mutation only ever writes a playable step", () => {
   assert.strictEqual(e2.motifMutations, 0, "NaN counted as a mutation");
 });
 
+test("a mutation moves like a melody, by learned intervals", () => {
+  const e = engine();
+  e.initMotifs();
+  const pool = e.motifPool(), st = (i) => 12 * Math.log2(e.degreeFreq(pool[i], 1));
+  const steps = [2, null, null];
+  let learned = 0, uniform = 0;
+  for (let k = 0; k < 997; k++) {
+    const i = e.learnedStep(steps, 1, k / 997);
+    assert.ok(Number.isInteger(i) && i >= 0 && i < pool.length, "off the pool: " + i);
+    learned += Math.abs(st(i) - st(2));
+    uniform += Math.abs(st(k % pool.length) - st(2));
+  }
+  assert.ok(learned < uniform, `learned leaps ${learned} not smaller than random ${uniform}`);
+  assert.ok(e.learnedStep([null, null], 0, 0.5) >= 0, "a silent motif still gets a note");
+});
+
 test("the pulse stays inside a musical tempo range", () => {
   const e = engine();
   e.setPulse(1);      assert.strictEqual(e.pulseMs, 110, "faster than the scheduler can place notes");
